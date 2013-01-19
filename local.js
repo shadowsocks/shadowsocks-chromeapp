@@ -67,68 +67,94 @@
   socket.create('tcp', {}, function(socketInfo) {
     var address, listen, port;
     listen = socketInfo.socketId;
+    console.log("listen: " + listen);
     address = '0.0.0.0';
     port = PORT;
     chrome.runtime.onSuspend.addListener(function() {
+      console.log('closing listen socket');
       return chrome.socket.destroy(listen);
     });
     return socket.listen(listen, address, port, function(result) {
+      console.log('listen');
       console.assert(0 === result);
       return socket.getInfo(listen, function(info) {
         var accept;
         console.log('server listening on http://localhost:' + info.localPort);
         accept = function(acceptInfo) {
           var encryptor, local;
-          console.assert(acceptInfo.resultCode === 0);
           socket.accept(listen, accept);
+          console.log('socket.accept');
+          console.assert(acceptInfo.resultCode === 0);
           local = acceptInfo.socketId;
+          console.log("accept " + local);
           encryptor = new Encryptor(KEY, METHOD);
-          return chrome.socket.create('tcp', {}, function(socketInfo) {
+          return socket.create('tcp', {}, function(socketInfo) {
             var remote;
             remote = socketInfo.socketId;
-            return chrome.socket.connect(remote, SERVER, REMOTE_PORT, function(result) {
+            return socket.connect(remote, SERVER, REMOTE_PORT, function(result) {
+              console.log("connect " + remote);
+              if (result !== 0) {
+                console.log("destroy " + local + " " + remote);
+                socket.destroy(local);
+                socket.destroy(remote);
+                return;
+              }
               console.assert(0 === result);
-              return chrome.socket.read(local, 256, function(readInfo) {
+              return socket.read(local, 256, function(readInfo) {
                 console.assert(readInfo.resultCode > 0);
-                return chrome.socket.write(local, string2ArrayBuffer('\x05\x00'), function(readInfo) {
+                return socket.write(local, string2ArrayBuffer('\x05\x00'), function(readInfo) {
                   console.assert(readInfo.bytesWritten === 2);
-                  console.log(readInfo);
-                  return chrome.socket.read(local, 3, function(readInfo) {
+                  return socket.read(local, 3, function(readInfo) {
                     console.assert(readInfo.resultCode > 0);
-                    console.log(readInfo);
-                    return chrome.socket.write(local, string2ArrayBuffer('\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00'), function(readInfo) {
+                    return socket.write(local, string2ArrayBuffer('\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00'), function(readInfo) {
                       var localToRemote, remoteToLocal;
                       console.assert(readInfo.bytesWritten === 10);
                       localToRemote = function(readInfo) {
                         var data;
-                        console.assert(readInfo.resultCode > 0);
                         if (readInfo.resultCode <= 0) {
+                          console.log("destroy " + local + " " + remote);
+                          socket.destroy(local);
+                          socket.destroy(remote);
                           return;
                         }
+                        console.assert(readInfo.resultCode > 0);
                         data = readInfo.data;
-                        console.log(readInfo);
                         data = encryptor.encrypt(data);
-                        return chrome.socket.write(remote, data, function(readInfo) {
-                          console.assert(readInfo.bytesWritten > 0);
-                          return chrome.socket.read(local, BUF_SIZE, localToRemote);
+                        return socket.write(remote, data, function(readInfo) {
+                          if (readInfo.bytesWritten <= 0) {
+                            console.log("destroy " + local + " " + remote);
+                            socket.destroy(local);
+                            socket.destroy(remote);
+                            return;
+                          }
+                          console.assert(readInfo.bytesWritten === data.byteLength);
+                          return socket.read(local, BUF_SIZE, localToRemote);
                         });
                       };
                       remoteToLocal = function(readInfo) {
                         var data;
-                        console.assert(readInfo.resultCode > 0);
                         if (readInfo.resultCode <= 0) {
+                          console.log("destroy " + local + " " + remote);
+                          socket.destroy(remote);
+                          socket.destroy(local);
                           return;
                         }
+                        console.assert(readInfo.resultCode > 0);
                         data = readInfo.data;
-                        console.log(readInfo);
                         data = encryptor.decrypt(data);
-                        return chrome.socket.write(local, data, function(readInfo) {
-                          console.assert(readInfo.bytesWritten > 0);
-                          return chrome.socket.read(remote, BUF_SIZE, remoteToLocal);
+                        return socket.write(local, data, function(readInfo) {
+                          if (readInfo.bytesWritten <= 0) {
+                            console.log("destroy " + local + " " + remote);
+                            socket.destroy(local);
+                            socket.destroy(remote);
+                            return;
+                          }
+                          console.assert(readInfo.bytesWritten === data.byteLength);
+                          return socket.read(remote, BUF_SIZE, remoteToLocal);
                         });
                       };
-                      chrome.socket.read(local, BUF_SIZE, localToRemote);
-                      return chrome.socket.read(remote, BUF_SIZE, remoteToLocal);
+                      socket.read(local, BUF_SIZE, localToRemote);
+                      return socket.read(remote, BUF_SIZE, remoteToLocal);
                     });
                   });
                 });

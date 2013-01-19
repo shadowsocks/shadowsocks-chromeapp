@@ -66,59 +66,82 @@ string2ArrayBuffer = (string) ->
 socket = chrome.socket
 socket.create 'tcp', {}, (socketInfo) ->
   listen = socketInfo.socketId
+  console.log "listen: #{listen}"
   address = '0.0.0.0'
   port = PORT
 
   chrome.runtime.onSuspend.addListener ->
+    console.log 'closing listen socket'
     chrome.socket.destroy listen
     
   socket.listen listen, address, port, (result)->
+    console.log 'listen'
     console.assert(0 == result)
     socket.getInfo listen, (info) ->
       console.log('server listening on http://localhost:' + info.localPort)
       accept = (acceptInfo) ->
-        console.assert acceptInfo.resultCode == 0
         socket.accept listen, accept
+        console.log 'socket.accept'
+        console.assert acceptInfo.resultCode == 0
         local = acceptInfo.socketId
+        console.log "accept #{local}"
   
         encryptor = new Encryptor(KEY, METHOD)
         # connect remote now
-        chrome.socket.create 'tcp', {}, (socketInfo) ->
+        socket.create 'tcp', {}, (socketInfo) ->
           remote = socketInfo.socketId
-          chrome.socket.connect remote, SERVER, REMOTE_PORT, (result)->
+          socket.connect remote, SERVER, REMOTE_PORT, (result)->
+            console.log "connect #{remote}"
+            if result != 0
+              console.log "destroy #{local} #{remote}"
+              socket.destroy local 
+              socket.destroy remote
+              return
             console.assert(0 == result)
-            chrome.socket.read local, 256, (readInfo)->
+            socket.read local, 256, (readInfo)->
               console.assert readInfo.resultCode > 0
-              chrome.socket.write local, string2ArrayBuffer('\x05\x00'), (readInfo) ->
+              socket.write local, string2ArrayBuffer('\x05\x00'), (readInfo) ->
                 console.assert readInfo.bytesWritten == 2
-                console.log readInfo
-                chrome.socket.read local, 3, (readInfo)->
+                socket.read local, 3, (readInfo)->
                   console.assert readInfo.resultCode > 0
-                  console.log readInfo
-                  chrome.socket.write local, string2ArrayBuffer('\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00'), (readInfo) ->
+                  socket.write local, string2ArrayBuffer('\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00'), (readInfo) ->
                     console.assert readInfo.bytesWritten == 10
                     localToRemote=(readInfo) ->
-                      console.assert readInfo.resultCode > 0
                       if readInfo.resultCode <= 0
+                        console.log "destroy #{local} #{remote}"
+                        socket.destroy local
+                        socket.destroy remote 
                         return
+                      console.assert readInfo.resultCode > 0
                       data = readInfo.data
-                      console.log readInfo
                       data = encryptor.encrypt(data)
-                      chrome.socket.write remote, data, (readInfo)->
-                        console.assert readInfo.bytesWritten > 0
-                        chrome.socket.read local, BUF_SIZE,localToRemote 
+                      socket.write remote, data, (readInfo)->
+                        if readInfo.bytesWritten <= 0
+                          console.log "destroy #{local} #{remote}"
+                          socket.destroy local
+                          socket.destroy remote 
+                          return
+                        console.assert readInfo.bytesWritten == data.byteLength
+                        socket.read local, BUF_SIZE,localToRemote 
                     remoteToLocal=(readInfo) ->
-                      console.assert readInfo.resultCode > 0
                       if readInfo.resultCode <= 0
+                        console.log "destroy #{local} #{remote}"
+                        socket.destroy remote
+                        socket.destroy local
                         return
+                      console.assert readInfo.resultCode > 0
                       data = readInfo.data
-                      console.log readInfo
                       data = encryptor.decrypt(data)
-                      chrome.socket.write local, data, (readInfo)->
-                        console.assert readInfo.bytesWritten > 0
-                        chrome.socket.read remote, BUF_SIZE,remoteToLocal
-                    chrome.socket.read local, BUF_SIZE,localToRemote
-                    chrome.socket.read remote, BUF_SIZE,remoteToLocal
+                      socket.write local, data, (readInfo)->
+                        if readInfo.bytesWritten <= 0
+                          console.log "destroy #{local} #{remote}"
+                          socket.destroy local
+                          socket.destroy remote 
+                          return
+                        console.assert readInfo.bytesWritten == data.byteLength
+                        socket.read remote, BUF_SIZE,remoteToLocal
+                    socket.read local, BUF_SIZE,localToRemote
+                    socket.read remote, BUF_SIZE,remoteToLocal
       socket.accept listen, accept
  
                       

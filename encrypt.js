@@ -47,14 +47,11 @@
   encrypt = function(table, buf) {
     var array, i;
     i = 0;
-    console.log(buf);
     array = new Uint8Array(buf);
-    console.log(array);
     while (i < array.length) {
       array[i] = table[array[i]];
       i++;
     }
-    console.log(array);
     return buf;
   };
 
