@@ -58,9 +58,13 @@ window.getTable = (key) ->
 encrypt = (table, buf) ->
   i = 0
 
-  while i < buf.length
-    buf[i] = table[buf[i]]
+  console.log buf
+  array = new Uint8Array(buf)
+  console.log array
+  while i < array.length
+    array[i] = table[array[i]]
     i++
+  console.log array
   buf
   
 
