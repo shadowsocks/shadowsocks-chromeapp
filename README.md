@@ -22,3 +22,5 @@ Click `Load Unpacked Extension`, select the root directory of this project.
 
 Open a new Tab, click Apps, then click shadowsocks. Fill in the blanks and click
 `Save`.
+
+Don't close the window or the proxy will shutdown.
