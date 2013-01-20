@@ -13,6 +13,7 @@
         "128":"icon-128.png"
     },
     "permissions":[
+        "storage",
         "experimental",
         {
             "socket":[
