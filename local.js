@@ -14,12 +14,10 @@
   };
 
   receiveRedirector = function(info) {
-    console.log('receiveRedirector', info);
     return receiveCallbacks[info.socketId](info.data, null);
   };
 
   errorRedirector = function(info) {
-    console.error('errorRedirector', info);
     return receiveCallbacks[info.socketId](null, info.resultCode);
   };
 
@@ -59,7 +57,6 @@
         });
         return tcpServer.listen(listen, address, port, function(result) {
           console.log('listen');
-          console.assert(0 === result);
           return tcpServer.getInfo(listen, function(info) {
             var accept;
             console.log('server listening on localhost:' + info.localPort);
@@ -81,9 +78,10 @@
                     console.log("close " + local + " " + remote);
                     tcp.close(local);
                     tcp.close(remote);
+                    delete receiveCallbacks[local];
+                    delete receiveCallbacks[remote];
                     return;
                   }
-                  console.assert(0 === result);
                   tcp.setPaused(remote, true);
                   return read(local, function(data, error) {
                     console.log('read 1');
@@ -108,6 +106,8 @@
                               console.log("close " + local + " " + remote);
                               tcp.close(local);
                               tcp.close(remote);
+                              delete receiveCallbacks[local];
+                              delete receiveCallbacks[remote];
                               return;
                             }
                             if (addrToSend) {
@@ -117,35 +117,32 @@
                               addrToSend = null;
                               data = tmp;
                             }
-                            console.assert(readInfo.resultCode > 0);
                             data = encryptor.encrypt(data);
                             return tcp.send(remote, data, function(sendInfo) {
                               if (sendInfo.resultCode < 0) {
                                 console.log("close " + local + " " + remote);
                                 tcp.close(local);
                                 tcp.close(remote);
-                                return;
+                                delete receiveCallbacks[local];
+                                delete receiveCallbacks[remote];
                               }
-                              return console.assert(readInfo.bytesSent === data.byteLength);
                             });
                           };
-                          remoteToLocal = function(data) {
+                          remoteToLocal = function(data, error) {
                             if (error) {
                               console.log("close " + local + " " + remote);
                               tcp.close(remote);
                               tcp.close(local);
+                              delete receiveCallbacks[local];
+                              delete receiveCallbacks[remote];
                               return;
                             }
-                            console.assert(readInfo.resultCode > 0);
-                            data = encryptor.decrypt(data);
                             return tcp.send(local, data, function(sendInfo) {
                               if (sendInfo.resultCode < 0) {
                                 console.log("close " + local + " " + remote);
                                 tcp.close(local);
                                 tcp.close(remote);
-                                return;
                               }
-                              return console.assert(readInfo.bytesSent === data.byteLength);
                             });
                           };
                           read(local, localToRemote);

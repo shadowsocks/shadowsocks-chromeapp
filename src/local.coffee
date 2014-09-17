@@ -28,11 +28,11 @@ read = (sockId, callback) ->
   tcp.setPaused(sockId, false)
 
 receiveRedirector = (info) ->
-  console.log 'receiveRedirector', info
+#  console.log 'receiveRedirector', info
   receiveCallbacks[info.socketId](info.data, null)
 
 errorRedirector = (info) ->
-  console.error 'errorRedirector', info
+#  console.error 'errorRedirector', info
   receiveCallbacks[info.socketId](null, info.resultCode)
 
 tcp.onReceive.addListener receiveRedirector
@@ -72,7 +72,7 @@ class Local
 
       tcpServer.listen listen, address, port, (result)->
         console.log 'listen'
-        console.assert(0 == result)
+#        console.assert(0 == result)
         tcpServer.getInfo listen, (info) ->
           console.log('server listening on localhost:' + info.localPort)
           accept = (acceptInfo) ->
@@ -92,8 +92,10 @@ class Local
                   console.log "close #{local} #{remote}"
                   tcp.close local
                   tcp.close remote
+                  delete receiveCallbacks[local]
+                  delete receiveCallbacks[remote]
                   return
-                console.assert(0 == result)
+#                console.assert(0 == result)
                 tcp.setPaused remote, true
                 read local, (data, error)->
                   console.log 'read 1'
@@ -119,6 +121,8 @@ class Local
                             console.log "close #{local} #{remote}"
                             tcp.close local
                             tcp.close remote
+                            delete receiveCallbacks[local]
+                            delete receiveCallbacks[remote]
                             return
                           if addrToSend
                             # TODO use better ways
@@ -128,7 +132,7 @@ class Local
                             addrToSend = null
                             data = tmp
 
-                          console.assert readInfo.resultCode > 0
+#                          console.assert readInfo.resultCode > 0
                           data = encryptor.encrypt(data)
                           tcp.send remote, data, (sendInfo)->
 #                            console.log 'remote sent'
@@ -137,17 +141,21 @@ class Local
                               console.log "close #{local} #{remote}"
                               tcp.close local
                               tcp.close remote
+                              delete receiveCallbacks[local]
+                              delete receiveCallbacks[remote]
                               return
-                            console.assert readInfo.bytesSent == data.byteLength
-                        remoteToLocal=(data) ->
+#                            console.assert readInfo.bytesSent == data.byteLength
+                        remoteToLocal=(data, error) ->
 #                          console.log 'remoteToLocal'
                           if error
                             console.log "close #{local} #{remote}"
                             tcp.close remote
                             tcp.close local
+                            delete receiveCallbacks[local]
+                            delete receiveCallbacks[remote]
                             return
-                          console.assert readInfo.resultCode > 0
-                          data = encryptor.decrypt(data)
+#                          console.assert readInfo.resultCode > 0
+#                          data = encryptor.decrypt(data)
                           tcp.send local, data, (sendInfo)->
 #                            console.log 'local sent'
 #                            console.log sendInfo.bytesSent, sendInfo.resultCode
@@ -156,7 +164,7 @@ class Local
                               tcp.close local
                               tcp.close remote
                               return
-                            console.assert readInfo.bytesSent == data.byteLength
+#                            console.assert readInfo.bytesSent == data.byteLength
                         read local, localToRemote
                         read remote, remoteToLocal
           tcpServer.onAccept.addListener accept
