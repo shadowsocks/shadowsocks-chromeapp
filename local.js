@@ -137,6 +137,7 @@
                               delete receiveCallbacks[remote];
                               return;
                             }
+                            data = encryptor.decrypt(data);
                             return tcp.send(local, data, function(sendInfo) {
                               if (sendInfo.resultCode < 0) {
                                 console.log("close " + local + " " + remote);

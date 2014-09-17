@@ -161,9 +161,9 @@ class Encryptor
       substitute @encryptTable, buf
 
   decrypt: (buf) ->
+    buf = new Uint8Array(buf)
     if @method?
       if not @decipher?
-        buf = new Uint8Array(buf)
         decipher_iv_len = @get_cipher_len(@method)[1]
         decipher_iv = buf.subarray(0, decipher_iv_len)
         @decipher = @get_cipher(@key, @method, 0, decipher_iv)
@@ -171,10 +171,9 @@ class Encryptor
         @decipher.update(result, buf.subarray(decipher_iv_len), buf.length - decipher_iv_len)
         return result.buffer
       else
-        return buf
-#        len = buf.byteLength
-#        @decipher.update(buf, buf, len)
-#        return buf.buffer
+        len = buf.byteLength
+        @decipher.update(buf, buf, len)
+        return buf.buffer
     else
       substitute @decryptTable, buf
       

@@ -155,7 +155,7 @@ class Local
                             delete receiveCallbacks[remote]
                             return
 #                          console.assert readInfo.resultCode > 0
-#                          data = encryptor.decrypt(data)
+                          data = encryptor.decrypt(data)
                           tcp.send local, data, (sendInfo)->
 #                            console.log 'local sent'
 #                            console.log sendInfo.bytesSent, sendInfo.resultCode

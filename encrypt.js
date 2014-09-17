@@ -178,10 +178,10 @@
     };
 
     Encryptor.prototype.decrypt = function(buf) {
-      var decipher_iv, decipher_iv_len, result;
+      var decipher_iv, decipher_iv_len, len, result;
+      buf = new Uint8Array(buf);
       if (this.method != null) {
         if (this.decipher == null) {
-          buf = new Uint8Array(buf);
           decipher_iv_len = this.get_cipher_len(this.method)[1];
           decipher_iv = buf.subarray(0, decipher_iv_len);
           this.decipher = this.get_cipher(this.key, this.method, 0, decipher_iv);
@@ -189,7 +189,9 @@
           this.decipher.update(result, buf.subarray(decipher_iv_len), buf.length - decipher_iv_len);
           return result.buffer;
         } else {
-          return buf;
+          len = buf.byteLength;
+          this.decipher.update(buf, buf, len);
+          return buf.buffer;
         }
       } else {
         return substitute(this.decryptTable, buf);
