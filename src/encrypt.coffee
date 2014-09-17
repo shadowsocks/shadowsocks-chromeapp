@@ -63,28 +63,100 @@ encrypt = (table, buf) ->
     array[i] = table[array[i]]
     i++
   buf
-  
+
+
+bytes_to_key_results = {}
+
+EVP_BytesToKey = (password, key_len, iv_len) ->
+  if bytes_to_key_results[password]
+    return bytes_to_key_results[password]
+  m = []
+  i = 0
+  count = 0
+  while count < key_len + iv_len
+    md5 = forge.md.md5.create()
+    data = password
+    if i > 0
+      data = [m[i - 1] + password]
+    md5.update(data)
+    d = md5.digest().bytes()
+    m.push(d)
+    count += d.length
+    i += 1
+  ms = m.join('')
+  key = ms.slice(0, key_len)
+  iv = ms.slice(key_len, key_len + iv_len)
+  bytes_to_key_results[password] = [key, iv]
+  return [key, iv]
+
+
+method_supported =
+  'aes-128-cfb': [16, 16, 'AES-CFB']
+  'aes-192-cfb': [24, 16, 'AES-CFB']
+  'aes-256-cfb': [32, 16, 'AES-CFB']
+
 
 class Encryptor
-  constructor: (key, @method) ->
+  constructor: (@key, @method) ->
+    @iv_sent = false
+    if @method == 'table'
+      @method = null
     if @method?
-      @cipher = crypto.createCipher @method, key
-      @decipher = crypto.createDecipher @method, key
+      @cipher = @get_cipher(@key, @method, 1, forge.random.getBytesSync(32))
     else
-      [@encryptTable, @decryptTable] = getTable(key)
-      
+      [@encryptTable, @decryptTable] = getTable(@key)
+
+  get_cipher_len: (method) ->
+    method = method.toLowerCase()
+    m = method_supported[method]
+    return m
+
+  get_cipher: (password, method, op, iv) ->
+    method = method.toLowerCase()
+    m = @get_cipher_len(method)
+    if m?
+      [key, iv_] = EVP_BytesToKey(password, m[0], m[1])
+      if not iv?
+        iv = iv_
+      if op == 1
+        @cipher_iv = iv.slice(0, m[1])
+      iv = iv.slice(0, m[1])
+      if op == 1
+        cipher = forge.cipher.createCipher(method, key)
+        cipher.start({
+          iv: iv
+        })
+        return cipher
+      else
+        decipher = forge.createCipher(method, key)
+        cipher.start({
+          iv: iv
+        })
+        return decipher
+
   encrypt: (buf) ->
     if @method?
-      result = new Buffer(@cipher.update(buf.toString('binary')), 'binary')
-      result
+      result = @cipher.update(buf.toString('binary'))
+      if @iv_sent
+        return result
+      else
+        @iv_sent = true
+        return @cipher_iv + result
     else
-      encrypt @encryptTable, buf
-      
+      substitute @encryptTable, buf
+
   decrypt: (buf) ->
     if @method?
-      result = new Buffer(@decipher.update(buf.toString('binary')), 'binary')
-      result
+      if not @decipher?
+        decipher_iv_len = @get_cipher_len(@method)[1]
+        decipher_iv = buf.slice(0, decipher_iv_len)
+        @decipher = @get_cipher(@key, @method, 0, decipher_iv)
+        result = to_buffer @decipher.update(buf.slice(decipher_iv_len).toString('binary'))
+        return result
+      else
+        result = to_buffer @decipher.update(buf.toString('binary'))
+        return result
     else
-      encrypt @decryptTable, buf
+      substitute @decryptTable, buf
       
 window.Encryptor = Encryptor

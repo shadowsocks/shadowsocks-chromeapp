@@ -5,7 +5,7 @@
   saveChanges = function() {
     var config;
     config = {};
-    $('input').each(function() {
+    $('input,select').each(function() {
       var key;
       key = $(this).attr('data-key');
       return config[key] = this.value;
@@ -20,7 +20,7 @@
   load = function() {
     var config;
     config = {};
-    $('input').each(function() {
+    $('input,select').each(function() {
       var key;
       key = $(this).attr('data-key');
       return config[key] = this.value;

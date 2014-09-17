@@ -9,6 +9,7 @@
         }
     </style>
     <script src="jshash-2.2/md5-min.js"></script>
+    <script src="forge.min.js"></script>
     <script src="merge_sort.js"></script>
     <script src="encrypt.js"></script>
     <script src="local.js"></script>
@@ -39,7 +40,18 @@
         </div>
     </div>
     <div class="control-group">
-        <label class="control-label" for="inputLocalPort">Local Port</label>
+        <label class="control-label" for="selectMethod">Encryption Method</label>
+        <div class="controls">
+            <select id="selectMethod" data-key="method">
+                <option value="aes-256-cfb">AES-256-CFB</option>
+                <option value="aes-192-cfb">AES-192-CFB</option>
+                <option value="aes-128-cfb">AES-128-CFB</option>
+                <option value="table" selected>Table</option>
+            </select>
+        </div>
+    </div>
+    <div class="control-group">
+        <label class="control-label" for="inputLocalPort">SOCKS 5 Proxy Port</label>
         <div class="controls">
             <input type="text" id="inputLocalPort" data-key="local_port" placeholder="Local Port">
         </div>

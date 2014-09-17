@@ -27,7 +27,7 @@ class Local
     REMOTE_PORT = +config.server_port
     PORT = +config.local_port
     KEY = config.password
-    METHOD = null
+    METHOD = config.method
 
     BUF_SIZE = 1500
 
