@@ -9,8 +9,9 @@
         }
     </style>
     <script src="jshash-2.2/md5-min.js"></script>
-    <script src="forge.min.js"></script>
     <script src="merge_sort.js"></script>
+    <script src="forge.min.js"></script>
+    <script src="jsrc4/jsrc4.js"></script>
     <script src="encrypt.js"></script>
     <script src="local.js"></script>
     <script src="jquery-1.9.0.min.js"></script>
@@ -43,10 +44,8 @@
         <label class="control-label" for="selectMethod">Encryption Method</label>
         <div class="controls">
             <select id="selectMethod" data-key="method">
-                <option value="aes-256-cfb">AES-256-CFB</option>
-                <option value="aes-192-cfb">AES-192-CFB</option>
-                <option value="aes-128-cfb">AES-128-CFB</option>
-                <option value="table" selected>Table</option>
+                <option value="rc4-md5" selected>RC4-MD5</option>
+                <option value="table">Table</option>
             </select>
         </div>
     </div>

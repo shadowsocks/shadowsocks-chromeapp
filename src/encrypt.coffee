@@ -67,6 +67,15 @@ encrypt = (table, buf) ->
 
 bytes_to_key_results = {}
 
+string2Uint8Array = (string) ->
+  arr = new Uint8Array(string.length)
+  for i in [0..(string.length - 1)]
+    arr[i] = string.charCodeAt(i)
+  arr
+
+uint82String = (arr) ->
+  String.fromCharCode.apply(null, arr)
+
 EVP_BytesToKey = (password, key_len, iv_len) ->
   if bytes_to_key_results[password]
     return bytes_to_key_results[password]
@@ -91,9 +100,17 @@ EVP_BytesToKey = (password, key_len, iv_len) ->
 
 
 method_supported =
-  'aes-128-cfb': [16, 16, 'AES-CFB']
-  'aes-192-cfb': [24, 16, 'AES-CFB']
-  'aes-256-cfb': [32, 16, 'AES-CFB']
+  'rc4-md5': [32, 16, 'RC4-MD5']
+
+createCipher = (method, key, iv, op) ->
+  if method == 'rc4-md5'
+    md = forge.md.md5.create()
+    md.update(key)
+    md.update(uint82String(iv))
+    rc4_key = string2Uint8Array(md.digest().data)
+    return RC4(rc4_key)
+  else
+    throw new Error("unknown cipher #{method}")
 
 
 class Encryptor
@@ -102,7 +119,7 @@ class Encryptor
     if @method == 'table'
       @method = null
     if @method?
-      @cipher = @get_cipher(@key, @method, 1, forge.random.getBytesSync(32))
+      @cipher = @get_cipher(@key, @method, 1, string2Uint8Array(forge.random.getBytesSync(32)))
     else
       [@encryptTable, @decryptTable] = getTable(@key)
 
@@ -116,32 +133,25 @@ class Encryptor
     m = @get_cipher_len(method)
     if m?
       [key, iv_] = EVP_BytesToKey(password, m[0], m[1])
-      if not iv?
-        iv = iv_
+      iv = iv.subarray(0, m[1])
       if op == 1
-        @cipher_iv = iv.slice(0, m[1])
-      iv = iv.slice(0, m[1])
-      if op == 1
-        cipher = forge.cipher.createCipher(method, key)
-        cipher.start({
-          iv: iv
-        })
-        return cipher
-      else
-        decipher = forge.createCipher(method, key)
-        cipher.start({
-          iv: iv
-        })
-        return decipher
+        @cipher_iv = iv
+      return createCipher(method, key, iv, op)
 
   encrypt: (buf) ->
     if @method?
-      result = @cipher.update(buf.toString('binary'))
+      len = buf.byteLength
+      result = new Uint8Array(len)
+      @cipher.update(result, buf, len)
       if @iv_sent
-        return result
+        return result.buffer
       else
         @iv_sent = true
-        return @cipher_iv + result
+        iv_len = @cipher_iv.byteLength
+        combined = new Uint8Array(iv_len + len)
+        combined.set(@cipher_iv, 0)
+        combined.set(result, iv_len)
+        return combined.buffer
     else
       substitute @encryptTable, buf
 
@@ -149,13 +159,16 @@ class Encryptor
     if @method?
       if not @decipher?
         decipher_iv_len = @get_cipher_len(@method)[1]
-        decipher_iv = buf.slice(0, decipher_iv_len)
+        decipher_iv = buf.subarray(0, decipher_iv_len)
         @decipher = @get_cipher(@key, @method, 0, decipher_iv)
-        result = to_buffer @decipher.update(buf.slice(decipher_iv_len).toString('binary'))
-        return result
+        result = new Uint8Array(buf.byteLength)
+        @decipher.update(buf.subarray(decipher_iv_len))
+        return result.buffer
       else
-        result = to_buffer @decipher.update(buf.toString('binary'))
-        return result
+        len = buf.byteLength
+        result = new Uint8Array(len)
+        @decipher.update(result, buf, len)
+        return result.buffer
     else
       substitute @decryptTable, buf
       

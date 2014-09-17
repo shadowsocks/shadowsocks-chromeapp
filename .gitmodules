@@ -1,0 +1,3 @@
+[submodule "jsrc4"]
+	path = jsrc4
+	url = git@github.com:clowwindy/jsrc4.git

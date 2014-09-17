@@ -21,6 +21,18 @@
 tcpServer = chrome.sockets.tcpServer
 tcp = chrome.sockets.tcp
 
+receiveCallbacks = {}
+
+read = (sockId, callback) ->
+  receiveCallbacks[sockId] = callback
+  tcp.setPaused(sockId, false)
+
+receiveRedirector = (info) ->
+  console.log 'receiveRedirector', info
+  receiveCallbacks[info.socketId](info.data)
+
+tcp.onReceive.addListener receiveRedirector
+
 class Local
   constructor: (config)->
     SERVER = config.server
@@ -51,20 +63,18 @@ class Local
 
       chrome.runtime.onSuspend.addListener ->
         console.log 'closing listen socket'
-        chrome.socket.destroy listen
+        chrome.tcpServer.close listen
 
       tcpServer.listen listen, address, port, (result)->
         console.log 'listen'
         console.assert(0 == result)
         tcpServer.getInfo listen, (info) ->
-          console.log('server listening on http://localhost:' + info.localPort)
+          console.log('server listening on localhost:' + info.localPort)
           accept = (acceptInfo) ->
-            if acceptInfo.resultCode != 0
+            console.log 'accepted'
+            if acceptInfo.clientSocketId == 0
               return
-            console.assert acceptInfo.resultCode == 0
-            tcpServer.accept listen, accept
-            console.log 'socket.accept'
-            local = acceptInfo.socketId
+            local = acceptInfo.clientSocketId
             console.log "accept #{local}"
 
             encryptor = new Encryptor(KEY, METHOD)
@@ -74,61 +84,58 @@ class Local
               tcp.connect remote, SERVER, REMOTE_PORT, (result)->
                 console.log "connect #{remote}"
                 if result != 0
-                  console.log "destroy #{local} #{remote}"
-                  tcp.destroy local
-                  tcp.destroy remote
+                  console.log "close #{local} #{remote}"
+                  tcp.close local
+                  tcp.close remote
                   return
                 console.assert(0 == result)
-                tcp.read local, 256, (readInfo)->
-                  console.assert readInfo.resultCode > 0
-                  tcp.write local, string2ArrayBuffer('\x05\x00'), (readInfo) ->
-                    console.assert readInfo.bytesWritten == 2
-                    tcp.read local, 3, (readInfo)->
+                read local, (data)->
+                  tcp.send local, string2ArrayBuffer('\x05\x00'), (readInfo) ->
+                    console.assert readInfo.bytesSent == 2
+                    read local, (data)->
                       console.assert readInfo.resultCode > 0
-                      tcp.write local, string2ArrayBuffer('\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00'), (readInfo) ->
-                        console.assert readInfo.bytesWritten == 10
-                        localToRemote=(readInfo) ->
-                          if readInfo.resultCode <= 0
-                            console.log "destroy #{local} #{remote}"
-                            tcp.destroy local
-                            tcp.destroy remote
-                            return
+                      tcp.send local, string2ArrayBuffer('\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00'), (readInfo) ->
+                        console.assert readInfo.bytesSent == 10
+                        localToRemote=(data) ->
+#                          if readInfo.resultCode <= 0
+#                            console.log "close #{local} #{remote}"
+#                            tcp.close local
+#                            tcp.close remote
+#                            return
                           console.assert readInfo.resultCode > 0
-                          data = readInfo.data
                           data = encryptor.encrypt(data)
-                          tcp.write remote, data, (readInfo)->
-                            if readInfo.bytesWritten <= 0
-                              console.log "destroy #{local} #{remote}"
-                              tcp.destroy local
-                              tcp.destroy remote
+                          tcp.send remote, data, (readInfo)->
+                            if readInfo.bytesSent <= 0
+                              console.log "close #{local} #{remote}"
+                              tcp.close local
+                              tcp.close remote
                               return
-                            console.assert readInfo.bytesWritten == data.byteLength
-                            tcp.read local, BUF_SIZE, localToRemote
-                        remoteToLocal=(readInfo) ->
-                          if readInfo.resultCode <= 0
-                            console.log "destroy #{local} #{remote}"
-                            tcp.destroy remote
-                            tcp.destroy local
-                            return
+                            console.assert readInfo.bytesSent == data.byteLength
+                            read local, BUF_SIZE, localToRemote
+                        remoteToLocal=(data) ->
+#                          if readInfo.resultCode <= 0
+#                            console.log "close #{local} #{remote}"
+#                            tcp.close remote
+#                            tcp.close local
+#                            return
                           console.assert readInfo.resultCode > 0
-                          data = readInfo.data
                           data = encryptor.decrypt(data)
-                          tcp.write local, data, (readInfo)->
-                            if readInfo.bytesWritten <= 0
-                              console.log "destroy #{local} #{remote}"
-                              tcp.destroy local
-                              tcp.destroy remote
+                          tcp.send local, data, (readInfo)->
+                            if readInfo.bytesSent <= 0
+                              console.log "close #{local} #{remote}"
+                              tcp.close local
+                              tcp.close remote
                               return
-                            console.assert readInfo.bytesWritten == data.byteLength
-                            tcp.read remote, BUF_SIZE, remoteToLocal
-                        tcp.read local, BUF_SIZE, localToRemote
-                        tcp.read remote, BUF_SIZE, remoteToLocal
-          tcpServer.accept listen, accept
+                            console.assert readInfo.bytesSent == data.byteLength
+                            read remote, BUF_SIZE, remoteToLocal
+                        read local, localToRemote
+                        read remote, remoteToLocal
+          tcpServer.onAccept.addListener accept
 
   close: ->
     console.log @listen
     if @listen
-      tcpServer.destroy @listen
+      tcpServer.close @listen
 
 window.Local = Local
 

@@ -26,7 +26,7 @@
       return config[key] = this.value;
     });
     return chrome.storage.sync.get(config, function(data) {
-      $('input').each(function() {
+      $('input,select').each(function() {
         var key;
         key = $(this).attr('data-key');
         return this.value = data[key] || '';

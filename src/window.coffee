@@ -14,7 +14,7 @@ load = ->
     key = $(this).attr('data-key')
     config[key] = this.value
   chrome.storage.sync.get config, (data)->
-    $('input').each ->
+    $('input,select').each ->
       key = $(this).attr('data-key')
       this.value = data[key] or ''
     restartServer(data)
