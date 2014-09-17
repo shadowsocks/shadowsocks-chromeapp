@@ -12,14 +12,15 @@
         "16":"icon-16.png",
         "128":"icon-128.png"
     },
-    "permissions":[
-        "storage",
-        "experimental",
-        {
-            "socket":[
-                "tcp-connect",
-                "tcp-listen"
-            ]
+    "permissions": [
+        "storage"
+    ],
+    "sockets": {
+        "tcp": {
+            "connect": ["*:*"]
+        },
+        "tcpServer": {
+            "listen": ["*:*"]
         }
-    ]
+    }
 }
