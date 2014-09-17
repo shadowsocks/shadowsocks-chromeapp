@@ -29,9 +29,14 @@ read = (sockId, callback) ->
 
 receiveRedirector = (info) ->
   console.log 'receiveRedirector', info
-  receiveCallbacks[info.socketId](info.data)
+  receiveCallbacks[info.socketId](info.data, null)
+
+errorRedirector = (info) ->
+  console.error 'errorRedirector', info
+  receiveCallbacks[info.socketId](null, info.resultCode)
 
 tcp.onReceive.addListener receiveRedirector
+tcp.onReceiveError.addListener errorRedirector
 
 class Local
   constructor: (config)->
@@ -89,45 +94,69 @@ class Local
                   tcp.close remote
                   return
                 console.assert(0 == result)
-                read local, (data)->
+                tcp.setPaused remote, true
+                read local, (data, error)->
+                  console.log 'read 1'
+                  console.log data.byteLength
+
                   tcp.send local, string2ArrayBuffer('\x05\x00'), (readInfo) ->
+                    console.log 'send 1'
+                    console.log data.byteLength
                     console.assert readInfo.bytesSent == 2
-                    read local, (data)->
+                    read local, (data, error)->
+
+                      console.log 'read 2'
+                      console.log data.byteLength
+                      addrToSend = new Uint8Array(data).subarray(3)
                       console.assert readInfo.resultCode > 0
+
                       tcp.send local, string2ArrayBuffer('\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00'), (readInfo) ->
+                        console.log 'send 2'
                         console.assert readInfo.bytesSent == 10
-                        localToRemote=(data) ->
-#                          if readInfo.resultCode <= 0
-#                            console.log "close #{local} #{remote}"
-#                            tcp.close local
-#                            tcp.close remote
-#                            return
+                        localToRemote=(data, error) ->
+#                          console.log 'localToRemote'
+                          if error
+                            console.log "close #{local} #{remote}"
+                            tcp.close local
+                            tcp.close remote
+                            return
+                          if addrToSend
+                            # TODO use better ways
+                            tmp = new Uint8Array(data.byteLength + addrToSend.byteLength)
+                            tmp.set addrToSend, 0
+                            tmp.set new Uint8Array(data), addrToSend.byteLength
+                            addrToSend = null
+                            data = tmp
+
                           console.assert readInfo.resultCode > 0
                           data = encryptor.encrypt(data)
-                          tcp.send remote, data, (readInfo)->
-                            if readInfo.bytesSent <= 0
+                          tcp.send remote, data, (sendInfo)->
+#                            console.log 'remote sent'
+#                            console.log sendInfo.bytesSent, sendInfo.resultCode
+                            if sendInfo.resultCode < 0
                               console.log "close #{local} #{remote}"
                               tcp.close local
                               tcp.close remote
                               return
                             console.assert readInfo.bytesSent == data.byteLength
-                            read local, BUF_SIZE, localToRemote
                         remoteToLocal=(data) ->
-#                          if readInfo.resultCode <= 0
-#                            console.log "close #{local} #{remote}"
-#                            tcp.close remote
-#                            tcp.close local
-#                            return
+#                          console.log 'remoteToLocal'
+                          if error
+                            console.log "close #{local} #{remote}"
+                            tcp.close remote
+                            tcp.close local
+                            return
                           console.assert readInfo.resultCode > 0
                           data = encryptor.decrypt(data)
-                          tcp.send local, data, (readInfo)->
-                            if readInfo.bytesSent <= 0
+                          tcp.send local, data, (sendInfo)->
+#                            console.log 'local sent'
+#                            console.log sendInfo.bytesSent, sendInfo.resultCode
+                            if sendInfo.resultCode < 0
                               console.log "close #{local} #{remote}"
                               tcp.close local
                               tcp.close remote
                               return
                             console.assert readInfo.bytesSent == data.byteLength
-                            read remote, BUF_SIZE, remoteToLocal
                         read local, localToRemote
                         read remote, remoteToLocal
           tcpServer.onAccept.addListener accept

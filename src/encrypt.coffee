@@ -100,7 +100,7 @@ EVP_BytesToKey = (password, key_len, iv_len) ->
 
 
 method_supported =
-  'rc4-md5': [32, 16, 'RC4-MD5']
+  'rc4-md5': [16, 16, 'RC4-MD5']
 
 createCipher = (method, key, iv, op) ->
   if method == 'rc4-md5'
@@ -108,6 +108,10 @@ createCipher = (method, key, iv, op) ->
     md.update(key)
     md.update(uint82String(iv))
     rc4_key = string2Uint8Array(md.digest().data)
+    key = string2Uint8Array(key)
+    console.log 'key:' + key[0].toString(16) + key[1].toString(16) + key[2].toString(16) + key[3].toString(16)
+    console.log 'iv:' + iv[0].toString(16) + iv[1].toString(16) + iv[2].toString(16) + iv[3].toString(16)
+    console.log 'rc4_key:' + rc4_key[0].toString(16) + rc4_key[1].toString(16) + rc4_key[2].toString(16) + rc4_key[3].toString(16)
     return RC4(rc4_key)
   else
     throw new Error("unknown cipher #{method}")
@@ -139,6 +143,7 @@ class Encryptor
       return createCipher(method, key, iv, op)
 
   encrypt: (buf) ->
+    buf = new Uint8Array(buf)
     if @method?
       len = buf.byteLength
       result = new Uint8Array(len)
@@ -156,13 +161,14 @@ class Encryptor
       substitute @encryptTable, buf
 
   decrypt: (buf) ->
+    buf = new Uint8Array(buf)
     if @method?
       if not @decipher?
         decipher_iv_len = @get_cipher_len(@method)[1]
         decipher_iv = buf.subarray(0, decipher_iv_len)
         @decipher = @get_cipher(@key, @method, 0, decipher_iv)
-        result = new Uint8Array(buf.byteLength)
-        @decipher.update(buf.subarray(decipher_iv_len))
+        result = new Uint8Array(buf.byteLength  - decipher_iv_len)
+        @decipher.update(result, buf.subarray(decipher_iv_len), buf.length - decipher_iv_len)
         return result.buffer
       else
         len = buf.byteLength

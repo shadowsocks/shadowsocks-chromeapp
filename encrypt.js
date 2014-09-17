@@ -98,7 +98,7 @@
   };
 
   method_supported = {
-    'rc4-md5': [32, 16, 'RC4-MD5']
+    'rc4-md5': [16, 16, 'RC4-MD5']
   };
 
   createCipher = function(method, key, iv, op) {
@@ -108,6 +108,10 @@
       md.update(key);
       md.update(uint82String(iv));
       rc4_key = string2Uint8Array(md.digest().data);
+      key = string2Uint8Array(key);
+      console.log('key:' + key[0].toString(16) + key[1].toString(16) + key[2].toString(16) + key[3].toString(16));
+      console.log('iv:' + iv[0].toString(16) + iv[1].toString(16) + iv[2].toString(16) + iv[3].toString(16));
+      console.log('rc4_key:' + rc4_key[0].toString(16) + rc4_key[1].toString(16) + rc4_key[2].toString(16) + rc4_key[3].toString(16));
       return RC4(rc4_key);
     } else {
       throw new Error("unknown cipher " + method);
@@ -153,6 +157,7 @@
 
     Encryptor.prototype.encrypt = function(buf) {
       var combined, iv_len, len, result;
+      buf = new Uint8Array(buf);
       if (this.method != null) {
         len = buf.byteLength;
         result = new Uint8Array(len);
@@ -174,13 +179,14 @@
 
     Encryptor.prototype.decrypt = function(buf) {
       var decipher_iv, decipher_iv_len, len, result;
+      buf = new Uint8Array(buf);
       if (this.method != null) {
         if (this.decipher == null) {
           decipher_iv_len = this.get_cipher_len(this.method)[1];
           decipher_iv = buf.subarray(0, decipher_iv_len);
           this.decipher = this.get_cipher(this.key, this.method, 0, decipher_iv);
-          result = new Uint8Array(buf.byteLength);
-          this.decipher.update(buf.subarray(decipher_iv_len));
+          result = new Uint8Array(buf.byteLength - decipher_iv_len);
+          this.decipher.update(result, buf.subarray(decipher_iv_len), buf.length - decipher_iv_len);
           return result.buffer;
         } else {
           len = buf.byteLength;
