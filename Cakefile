@@ -7,7 +7,7 @@ build = () ->
     coffeeCmd = 'coffee.cmd'
   else
     coffeeCmd = 'coffee'
-  coffee = spawn coffeeCmd, ['-c', '-o', '.', 'src']
+  coffee = spawn coffeeCmd, ['-c', '-b', '-o', 'lib', 'src']
   coffee.stderr.on 'data', (data) ->
     process.stderr.write data.toString()
   coffee.stdout.on 'data', (data) ->
@@ -16,6 +16,6 @@ build = () ->
     if code != 0
       process.exit code
 
-task 'build', 'Build ./ from src/', ->
+task 'build', 'Build to lib/ from src/', ->
   build()
 
