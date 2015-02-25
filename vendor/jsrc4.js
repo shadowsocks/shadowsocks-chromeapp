@@ -20,9 +20,7 @@
  SOFTWARE.
  **/
 
-"use strict";
-
-var RC4 = function(key) {
+var RC4 = function(key) { "use strict";
     if (!(this instanceof RC4))
         return new RC4(key);
 
@@ -42,7 +40,7 @@ var RC4 = function(key) {
     this._j = 0;
 };
 
-RC4.prototype.update = function(cipherText, plainText, bytes) {
+RC4.prototype.update = function(cipherText, plainText, bytes) { "use strict";
     var x, y, p, i = this._i, j = this._j, s = this._s;
     for (p = 0; p < bytes; p++) {
         i = (i + 1) % 256;
