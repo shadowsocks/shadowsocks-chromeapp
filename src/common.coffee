@@ -36,10 +36,7 @@ Common.str2Uint8 = (str) ->
 
 
 Common.uint82Str = (uint8) ->
-  str = ""
-  for i in [0...uint8.length]
-    str += String.fromCharCode uint8[i]
-  return str
+  String.fromCharCode uint8...
 
 
 Common.typedArrayCpy = (dst, src, dstStart = 0, srcStart = 0, dstEnd = dst.length, srcEnd = src.length) ->
@@ -228,3 +225,8 @@ Common.test = () ->
   testHeader = Common.packHeader(0x00, 0x04, "1234::5678", 8080)
   console.assert array_equals(testHeader, new Uint8Array([0x05, 0x00, 0x00, 0x04, 0x12, 0x34, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x56, 0x78, 0x1f, 0x90]))
+
+  console.log "All test passed!"
+
+
+# do Common.test
