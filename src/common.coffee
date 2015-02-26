@@ -22,12 +22,7 @@
 Common = {}
 
 
-Common.typedIndexOf = (typedArray, searchElement, fromIndex = 0) ->
-  for element, index in typedArray
-    return index if element is searchElement and index >= fromIndex
-  return -1
-
-
+# (String) -> Uint8Array
 Common.str2Uint8 = (str) ->
   arr = new Uint8Array str.length
   for i in [0...str.length]
@@ -35,10 +30,19 @@ Common.str2Uint8 = (str) ->
   return arr
 
 
+# (Uint8Array) -> String
 Common.uint82Str = (uint8) ->
   String.fromCharCode uint8...
 
 
+# (TypedArray|Array, Number, int) -> int
+Common.typedIndexOf = (typedArray, searchElement, fromIndex = 0) ->
+  for element, index in typedArray
+    return index if element is searchElement and index >= fromIndex
+  return -1
+
+
+# (TypedArray|Array, TypedArray|Array, int, int, int, int) -> int
 Common.typedArrayCpy = (dst, src, dstStart = 0, srcStart = 0, dstEnd = dst.length, srcEnd = src.length) ->
   len = Math.min srcEnd - srcStart, dstEnd - dstStart
   for i in [dstStart...dstStart + len]
@@ -46,10 +50,12 @@ Common.typedArrayCpy = (dst, src, dstStart = 0, srcStart = 0, dstEnd = dst.lengt
   return len
 
 
+# (int, int, ...) -> String
 Common.bytes2FixedHexString = (bytes...) ->
   ((if byte < 16 then "0" else "") + byte.toString(16) for byte in bytes).join('')
 
 
+# (0x01|0x04, TypedArray|Array<int>) -> String
 Common.inet_ntop = (family, array) ->
   if family is 0x01 and array.length is 4         # IPv4
     return (i for i in array).join('.')
@@ -59,6 +65,7 @@ Common.inet_ntop = (family, array) ->
     console.error "Not a valid family."
 
 
+# (0x01|0x04, String) -> Array<int>
 Common.inet_pton = (family, str) ->
   if family is 0x01       # IPv4
     return (parseInt byte for byte in str.split('.'))
@@ -102,7 +109,7 @@ fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|     # fe80::7:8%eth0   fe80::7:8%
 ((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}
 (25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])           # 2001:db8:3:4::192.0.2.33  64:ff9b::192.0.2.33 (IPv4-Embedded IPv6 Address)
 ) ///
-Common.guessFamily = (str) ->
+Common.guessFamily = (str) ->     # (String) -> 0x01|0x03|0x04
   if Common.regExpIPv4.test str
     return 0x01
   else if Common.regExpIPv6.test str
@@ -111,6 +118,7 @@ Common.guessFamily = (str) ->
     return 0x03
 
 
+# (Uint8Array) -> Object
 Common.parseHeader = (data) ->
   switch data[3]    # ATYP
     when 0x01       # IPv4
@@ -127,11 +135,12 @@ Common.parseHeader = (data) ->
     else
       console.error "Not a valid ATYP."
       return null
-  prt = data.subarray(-2)
+  prt = data.subarray -2
   port = prt[0] << 8 | prt[1]
   ver: data[0], cmd: data[1], rsv: data[2], atyp: data[3], dst: dst, port: port
 
 
+# (int, 0x01|0x03|0x04, String, String|int) -> Uint8Array
 Common.packHeader = (rep, atyp, addr, port) ->
   switch atyp
     when 0x01 then len = 10   # 1 (VER) + 1 (REP) + 1 (RSV) + 1 (ATYP) + 4 (BND.ADDR) + 2 (BND.PORT)
@@ -140,7 +149,7 @@ Common.packHeader = (rep, atyp, addr, port) ->
     else return console.error "Not a valid ATYP."
 
   index = 0
-  arr = new Uint8Array(len)
+  arr = new Uint8Array len
   arr[index++] = 0x05   # VER = 0x05
   arr[index++] = rep
   arr[index++] = 0x00   # RSV = 0x00
@@ -150,7 +159,7 @@ Common.packHeader = (rep, atyp, addr, port) ->
     bindAddr = Common.inet_pton atyp, addr
   else
     bindAddr = Common.str2Uint8 addr
-  index += Common.typedArrayCpy(arr, bindAddr, index)
+  index += Common.typedArrayCpy arr, bindAddr, index
   arr[index++] = (port & 0xff00) >> 8
   arr[index++] = port & 0xff
   console.assert index is len
@@ -163,14 +172,14 @@ Common.test = () ->
     for i in [0...arr1.length]
       return false if arr1[i] isnt arr2[i]
     return true
-
-  # Test for typedIndexOf
-  console.assert Common.typedIndexOf(new Uint8Array([0xa1, 0x35, 0xc0, 0x35]), 0x35, 1) is 1
-  console.assert Common.typedIndexOf(new Uint8Array([0xa1, 0x35, 0xc0, 0x35]), 0x35, 2) is 3
   
   # Test for uint8 <=> string
   console.assert array_equals(Common.str2Uint8("h.w"), new Uint8Array([104, 46, 119]))
   console.assert Common.uint82Str(new Uint8Array([104, 46, 119])) is "h.w"
+
+  # Test for typedIndexOf
+  console.assert Common.typedIndexOf(new Uint8Array([0xa1, 0x35, 0xc0, 0x35]), 0x35, 1) is 1
+  console.assert Common.typedIndexOf(new Uint8Array([0xa1, 0x35, 0xc0, 0x35]), 0x35, 2) is 3
 
   # Test for typedArrayCpy
   arr1 = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
