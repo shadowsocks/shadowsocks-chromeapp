@@ -1,19 +1,23 @@
 {
-    "name":"shadowsocks",
-    "description":"shadowsocks client for Chrome.",
+    "name":"Shadowsocks",
+    "description":"Shadowsocks client for Chrome.",
     "version":"0.1",
     "manifest_version":2,
     "app":{
         "background":{
-            "scripts":["background.js"]
+            "scripts":[
+                "vendor/forge.min.js", "vendor/jsrc4.js",
+                "lib/common.js", "lib/crypto/rc4_md5.js",
+                "lib/encrypt.js", "lib/socks5.js", "lib/background.js"
+            ]
         }
     },
     "icons":{
-        "16":"icon-16.png",
-        "128":"icon-128.png"
+        "16":"res/img/icon-16.png",
+        "128":"res/img/icon-128.png"
     },
     "permissions": [
-        "storage"
+        "background", "storage"
     ],
     "sockets": {
         "tcp": {
