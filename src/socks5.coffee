@@ -179,7 +179,8 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
 
 SOCKS5::cmd_bind = (socket_id, header, origin_data) ->
   console.warn "CMD BIND is not implemented in shadowsocks."
-  chrome.sockets.tcp.send socket_id, Common.packHeader(0x07, header.atyp, 0, 0).buffer, () =>
+  data = Common.packHeader 0x07, 0x01, '0.0.0.0', 0
+  chrome.sockets.tcp.send socket_id, data.buffer, () =>
     @close_socket socket_id
 
 
@@ -195,24 +196,24 @@ SOCKS5::tcp_relay = (socket_id, data_array) ->
 
   data = socket_info.cipher[socket_info.cipher_action](data_array)
   chrome.sockets.tcp.send peer_socket_id, data.buffer, (sendInfo) =>
-    if sendInfo.resultCode < 0 or chrome.runtime.lastError
-      console.debug "Failed to relay data from #{socket_info.type} 
+    if sendInfo.resultCode < 0 or chrome.runtime.lastError and socket_id of @socket_info
+      console.debug "Failed to relay data from #{socket_info.type}
         #{socket_id} to peer #{peer_socket_id}:", chrome.runtime.lastError
       @close_socket socket_id
       return
 
 
 SOCKS5::close_socket = (socket_id, close_peer = true) ->
+  if socket_id of @socket_info
+    peer_socket_id = @socket_info[socket_id].peer_socket_id
+    delete @socket_info[socket_id]['cipher']
+    delete @socket_info[socket_id]
   chrome.sockets.tcp.close socket_id, () ->
     if chrome.runtime.lastError
       console.debug "Error on close socket #{socket_id}", chrome.runtime.lastError
-  return if socket_id not of @socket_info
-  socket_info = @socket_info[socket_id]
-  delete socket_info['cipher']
-  delete @socket_info[socket_id]
-  if socket_info.peer_socket_id? and close_peer
-    @close_socket socket_info.peer_socket_id, false
   # console.debug "Socket #{socket_id} closed"
+  if peer_socket_id of @socket_info and close_peer
+    @close_socket peer_socket_id, false
 
 
 SOCKS5::sweep_socket = () ->
