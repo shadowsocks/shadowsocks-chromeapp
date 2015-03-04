@@ -109,8 +109,8 @@ Encryptor::decrypt = (buf) ->
   return buf if buf.length is 0
   if not @decipher?
     decipher_iv_len = @_method_info[1]
-    decipher_iv = Common.uint82Str buf.subarray(0, decipher_iv_len)
-    @decipher = @get_cipher @key, @method, 0, decipher_iv
+    @decipher_iv = Common.uint82Str buf.subarray(0, decipher_iv_len)
+    @decipher = @get_cipher @key, @method, 0, @decipher_iv
     buf = new Uint8Array buf.subarray decipher_iv_len
     return buf if buf.length is 0
   return @decipher.update buf

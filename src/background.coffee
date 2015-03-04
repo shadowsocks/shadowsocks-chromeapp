@@ -28,5 +28,5 @@ local = new Local
   server_port: 8388
   local_port: 1080
   password: '1234'
-  method: 'rc4-md5'
+  method: 'aes-256-cfb'
   timeout: 300
