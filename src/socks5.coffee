@@ -20,7 +20,7 @@
 
 
 SOCKS5 = (config) ->
-  @socket_info = {}
+  @tcp_socket_info = {}
   @socket_server_id = null
   {@server, @server_port, @password, @method, @local_port, @timeout} = config
   setInterval () =>
@@ -32,7 +32,7 @@ SOCKS5 = (config) ->
 SOCKS5::handle_accept = (info) ->
   {socketId, clientSocketId} = info
   return if socketId isnt @socket_server_id
-  @socket_info[clientSocketId] =
+  @tcp_socket_info[clientSocketId] =
     type:            "local"
     status:          "auth"
     cipher:          new Encryptor @password, @method
@@ -46,12 +46,12 @@ SOCKS5::handle_accept = (info) ->
 
 SOCKS5::handle_recv = (info) ->
   {socketId, data} = info
-  if socketId not of @socket_info
+  if socketId not of @tcp_socket_info
     console.debug "Unknown or closed socket: #{socketId}"
     return
 
   array = new Uint8Array data
-  switch @socket_info[socketId].status
+  switch @tcp_socket_info[socketId].status
     when "cmd" then @cmd socketId, array
     when "auth" then @auth socketId, array
     when "tcp_relay" then @tcp_relay socketId, array
@@ -95,7 +95,7 @@ SOCKS5::terminate = () ->
   chrome.sockets.tcpServer.close @socket_server_id
   @socket_server_id = null
 
-  for socket_id in @socket_info
+  for socket_id in @tcp_socket_info
     @close_socket socket_id, false
   return
 
@@ -113,8 +113,8 @@ SOCKS5::auth = (socket_id, data) ->
     return
 
   chrome.sockets.tcp.send socket_id, new Uint8Array([0x05, 0x00]).buffer, () =>
-    @socket_info[socket_id].status = "cmd"
-    @socket_info[socket_id].last_connection = do Date.now
+    @tcp_socket_info[socket_id].status = "cmd"
+    @tcp_socket_info[socket_id].last_connection = do Date.now
     # console.debug "SOCKS5 auth passed"
 
 
@@ -134,12 +134,12 @@ SOCKS5::cmd = (socket_id, data) ->
       chrome.sockets.tcp.send socket_id, reply.buffer, () =>
         @close_socket socket_id
       console.error "Not a valid CMD field."
-  @socket_info[socket_id].last_connection = do Date.now
+  @tcp_socket_info[socket_id].last_connection = do Date.now
 
 
 SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
   chrome.sockets.tcp.create name: 'remote_socket', (createInfo) =>
-    @socket_info[socket_id].peer_socket_id = createInfo.socketId
+    @tcp_socket_info[socket_id].peer_socket_id = createInfo.socketId
 
     chrome.sockets.tcp.connect createInfo.socketId, @server, @server_port, (result) =>
       error_reply = Common.packHeader 0x01, 0x01, '0.0.0.0', 0
@@ -149,7 +149,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
           @close_socket socket_id
         return
 
-      @socket_info[createInfo.socketId] =
+      @tcp_socket_info[createInfo.socketId] =
         type:            "remote"
         status:          "tcp_relay"
         cipher:          new Encryptor @password, @method
@@ -158,7 +158,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
         cipher_action:   "decrypt"
         last_connection: do Date.now
 
-      data = @socket_info[socket_id].cipher.encrypt new Uint8Array origin_data.subarray 3
+      data = @tcp_socket_info[socket_id].cipher.encrypt new Uint8Array origin_data.subarray 3
       chrome.sockets.tcp.send createInfo.socketId, data.buffer, (sendInfo) =>
         if sendInfo.resultCode < 0 or chrome.runtime.lastError
           console.error "Failed to send encrypted request to shadowsocks server:", chrome.runtime.lastError
@@ -173,7 +173,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
             @close_socket socket_id
             return
 
-          @socket_info[socket_id].status = "tcp_relay"
+          @tcp_socket_info[socket_id].status = "tcp_relay"
           # console.debug "SOCKS5 connect okay"
 
 
@@ -189,36 +189,36 @@ SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
 
 
 SOCKS5::tcp_relay = (socket_id, data_array) ->
-  socket_info = @socket_info[socket_id]
+  socket_info = @tcp_socket_info[socket_id]
   socket_info.last_connection = do Date.now
   peer_socket_id = socket_info.peer_socket_id
-  @socket_info[peer_socket_id].last_connection = do Date.now
+  @tcp_socket_info[peer_socket_id].last_connection = do Date.now
 
   data = socket_info.cipher[socket_info.cipher_action](data_array)
   chrome.sockets.tcp.send peer_socket_id, data.buffer, (sendInfo) =>
-    if sendInfo.resultCode < 0 or chrome.runtime.lastError and socket_id of @socket_info
+    if sendInfo.resultCode < 0 or chrome.runtime.lastError and socket_id of @tcp_socket_info
       console.debug "Failed to relay data from #{socket_info.type}
         #{socket_id} to peer #{peer_socket_id}:", chrome.runtime.lastError
       @close_socket socket_id
       return
 
 
-SOCKS5::close_socket = (socket_id, close_peer = true) ->
-  if socket_id of @socket_info
-    peer_socket_id = @socket_info[socket_id].peer_socket_id
-    delete @socket_info[socket_id]['cipher']
-    delete @socket_info[socket_id]
-  chrome.sockets.tcp.close socket_id, () ->
+SOCKS5::close_socket = (socket_id, close_peer = true, protocol = "tcp") ->
+  if socket_id of @["#{protocol}_socket_info"]
+    peer_socket_id = @["#{protocol}_socket_info"][socket_id].peer_socket_id
+    delete @["#{protocol}_socket_info"][socket_id]['cipher']
+    delete @["#{protocol}_socket_info"][socket_id]
+  chrome.sockets[protocol].close socket_id, () ->
     if chrome.runtime.lastError
-      console.debug "Error on close socket #{socket_id}", chrome.runtime.lastError
+      console.debug "Error on close #{protocol} socket #{socket_id}", chrome.runtime.lastError
   # console.debug "Socket #{socket_id} closed"
-  if peer_socket_id of @socket_info and close_peer
-    @close_socket peer_socket_id, false
+  if peer_socket_id of @["#{protocol}_socket_info"] and close_peer
+    @close_socket peer_socket_id, false, protocol
 
 
 SOCKS5::sweep_socket = () ->
   console.debug "Sweeping timeout socket..."
-  for socket_id, socket of @socket_info
+  for socket_id, socket of @tcp_socket_info
     if Date.now() - socket.last_connection >= @timeout * 1000
       chrome.sockets.tcp.getInfo socket_id, (socketInfo) =>
         @close_socket socket_id if not socketInfo.connected
