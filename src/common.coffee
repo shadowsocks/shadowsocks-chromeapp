@@ -140,12 +140,14 @@ Common.parseHeader = (data) ->
   ver: data[0], cmd: data[1], rsv: data[2], atyp: data[3], dst: dst, port: port
 
 
-# (int, 0x01|0x03|0x04, String, String|int) -> Uint8Array
-Common.packHeader = (rep, atyp, addr, port) ->
+# (int, 0x01|0x03|0x04|0x80|null, String, String|int) -> Uint8Array
+# set atyp to null or 0x80 means guess the type of address
+Common.packHeader = (rep, atyp = 0x80, addr, port) ->
   switch atyp
     when 0x01 then len = 10   # 1 (VER) + 1 (REP) + 1 (RSV) + 1 (ATYP) + 4 (BND.ADDR) + 2 (BND.PORT)
     when 0x03 then len = 7 + addr.length  # VER + REP + RSV + ATYP + (1 + LEN)(BND.ADDR) + BND.PORT
     when 0x04 then len = 22   # VER + REP + RSV + ATYP + 16 (BND.ADDR) + BND.PORT
+    when 0x80 then return Common.packHeader rep, Common.guessFamily(addr), addr, port
     else return console.error "Not a valid ATYP."
 
   index = 0
@@ -172,7 +174,7 @@ Common.test = () ->
     for i in [0...arr1.length]
       return false if arr1[i] isnt arr2[i]
     return true
-  
+
   # Test for uint8 <=> string
   console.assert array_equals(Common.str2Uint8("h.w"), new Uint8Array([104, 46, 119]))
   console.assert Common.uint82Str(new Uint8Array([104, 46, 119])) is "h.w"
@@ -232,6 +234,13 @@ Common.test = () ->
   testHeader = Common.packHeader(0x00, 0x03, "h.w", 80)
   console.assert array_equals(testHeader, new Uint8Array([0x05, 0x00, 0x00, 0x03, 0x03, 0x68, 0x2e, 0x77, 0x00, 0x50]))
   testHeader = Common.packHeader(0x00, 0x04, "1234::5678", 8080)
+  console.assert array_equals(testHeader, new Uint8Array([0x05, 0x00, 0x00, 0x04, 0x12, 0x34, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x56, 0x78, 0x1f, 0x90]))
+  testHeader = Common.packHeader(0x00, 0x80, "203.208.41.145", 443)
+  console.assert array_equals(testHeader, new Uint8Array([0x05, 0x00, 0x00, 0x01, 0xcb, 0xd0, 0x29, 0x91, 0x01, 0xbb]))
+  testHeader = Common.packHeader(0x00, null, "h.w", 80)
+  console.assert array_equals(testHeader, new Uint8Array([0x05, 0x00, 0x00, 0x03, 0x03, 0x68, 0x2e, 0x77, 0x00, 0x50]))
+  testHeader = Common.packHeader(0x00, null, "1234::5678", 8080)
   console.assert array_equals(testHeader, new Uint8Array([0x05, 0x00, 0x00, 0x04, 0x12, 0x34, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x56, 0x78, 0x1f, 0x90]))
 
