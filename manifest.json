@@ -7,7 +7,7 @@
         "background":{
             "scripts":[
                 "vendor/forge.min.js", "vendor/jsrc4.js",
-                "lib/common.js", "lib/crypto/rc4_md5.js",
+                "lib/common.js", "lib/crypto/rc4_md5.js", "lib/crypto/forge.js",
                 "lib/encrypt.js", "lib/socks5.js", "lib/background.js"
             ]
         }

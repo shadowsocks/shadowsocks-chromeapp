@@ -34,6 +34,15 @@ Encryptor = (@key, @method) ->
 
 Encryptor.method_supported =
   'rc4-md5': [16, 16, Crypto.RC4_MD5]
+  'aes-128-cfb': [16, 16, Crypto.Forge]
+  'aes-192-cfb': [24, 16, Crypto.Forge]
+  'aes-256-cfb': [32, 16, Crypto.Forge]
+  'aes-128-ofb': [16, 16, Crypto.Forge]
+  'aes-192-ofb': [24, 16, Crypto.Forge]
+  'aes-256-ofb': [32, 16, Crypto.Forge]
+  'aes-128-ctr': [16, 16, Crypto.Forge]
+  'aes-192-ctr': [24, 16, Crypto.Forge]
+  'aes-256-ctr': [32, 16, Crypto.Forge]
 
 
 # (str, int, int) -> [binstr, binstr]
@@ -100,8 +109,8 @@ Encryptor::decrypt = (buf) ->
   return buf if buf.length is 0
   if not @decipher?
     decipher_iv_len = @_method_info[1]
-    decipher_iv = Common.uint82Str buf.subarray(0, decipher_iv_len)
-    @decipher = @get_cipher @key, @method, 0, decipher_iv
+    @decipher_iv = Common.uint82Str buf.subarray(0, decipher_iv_len)
+    @decipher = @get_cipher @key, @method, 0, @decipher_iv
     buf = new Uint8Array buf.subarray decipher_iv_len
     return buf if buf.length is 0
   return @decipher.update buf

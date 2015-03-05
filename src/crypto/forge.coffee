@@ -19,14 +19,22 @@
 # SOFTWARE.
 
 
-Local = (config) ->
-  @socks5 = new SOCKS5 config
-  do @socks5.listen
+Crypto = if Crypto? then Crypto else {}
 
-local = new Local
-  server: "127.0.0.1"
-  server_port: 8388
-  local_port: 1080
-  password: '1234'
-  method: 'aes-256-cfb'
-  timeout: 300
+
+# (String, binstr, binstr, 0|1)
+Crypto.Forge = (cipher_name, key, iv, op) ->
+  cipher_info = cipher_name.match /^(aes)-(128|192|256)-(cfb|ofb|ctr)$/i
+  console.assert key.length is cipher_info[2] / 8, "Cipher and key length mismatch."
+  if op is 1  # cipher
+    @cipher = forge.cipher.createCipher "#{cipher_info[1]}-#{cipher_info[3]}", key
+  else        # 0 is decipher
+    @cipher = forge.cipher.createDecipher "#{cipher_info[1]}-#{cipher_info[3]}", key
+  @cipher.start iv: iv
+  return
+
+
+# (Uint8Array) -> Uint8Array
+Crypto.Forge::update = (data) ->
+  @cipher.update forge.util.createBuffer Common.uint82Str data
+  return Common.str2Uint8 do @cipher.output.getBytes
