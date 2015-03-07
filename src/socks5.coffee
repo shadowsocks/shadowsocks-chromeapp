@@ -21,6 +21,7 @@
 
 SOCKS5 = (config) ->
   @tcp_socket_info = {}
+  @udp_socket_info = {}
   @socket_server_id = null
   {@server, @server_port, @password, @method, @local_port, @timeout} = config
   setInterval () =>
@@ -47,15 +48,25 @@ SOCKS5::handle_accept = (info) ->
 SOCKS5::handle_recv = (info) ->
   {socketId, data} = info
   if socketId not of @tcp_socket_info
-    console.debug "Unknown or closed socket: #{socketId}"
-    return
+    console.debug "Unknown or closed TCP socket: #{socketId}"
+    return @close_socket socketId, false, "tcp"
 
   array = new Uint8Array data
   switch @tcp_socket_info[socketId].status
     when "cmd" then @cmd socketId, array
     when "auth" then @auth socketId, array
     when "tcp_relay" then @tcp_relay socketId, array
+    when "udp_relay" then console.warn "Unexcepted TCP packet received when relaying udp."
     else console.error "FSM: Not a valid state."
+
+
+SOCKS5::handle_udp_recv = (info) ->
+  {socketId, data, remoteAddress, remotePort} = info
+  if socketId not of @udp_socket_info
+    console.debug "Unknown or closed UDP socket: #{socketId}"
+    return @close_socket socketId, false, "udp"
+
+  @udp_relay socketId, new Uint8Array(data), remoteAddress, remotePort
 
 
 SOCKS5::handle_accepterr = (info) ->
@@ -65,8 +76,17 @@ SOCKS5::handle_accepterr = (info) ->
 
 SOCKS5::handle_recverr = (info) ->
   {socketId, resultCode} = info
-  console.debug "Socket #{socketId} occurs receive error #{resultCode}" if resultCode isnt -100
+  console.debug "TCP socket #{socketId} occurs receive error #{resultCode}" if resultCode isnt -100
   @close_socket socketId
+
+
+SOCKS5::handle_udp_recverr = (info) ->
+  {socketId, resultCode} = info
+  console.debug "UDP socket #{socketId} occurs receive error #{resultCode}"
+  if socketId of @udp_socket_info
+    @close_socket @udp_socket_info[socketId].host_tcp_id
+  else
+    @close_socket socketId, false, "udp"
 
 
 SOCKS5::listen = () ->
@@ -80,10 +100,12 @@ SOCKS5::listen = () ->
         return
 
       console.debug "Listening on port #{@local_port}..."
-      chrome.sockets.tcpServer.onAccept.addListener      @accept_handler = (info) =>    @handle_accept info
-      chrome.sockets.tcpServer.onAcceptError.addListener @accepterr_handler = (info) => @handle_accepterr info
-      chrome.sockets.tcp.onReceive.addListener           @recv_handler = (info) =>      @handle_recv info
-      chrome.sockets.tcp.onReceiveError.addListener      @recverr_handler = (info) =>   @handle_recverr info
+      chrome.sockets.tcpServer.onAccept.addListener      @accept_handler      = (info) => @handle_accept info
+      chrome.sockets.tcpServer.onAcceptError.addListener @accepterr_handler   = (info) => @handle_accepterr info
+      chrome.sockets.tcp.onReceive.addListener           @recv_handler        = (info) => @handle_recv info
+      chrome.sockets.tcp.onReceiveError.addListener      @recverr_handler     = (info) => @handle_recverr info
+      chrome.sockets.udp.onReceive.addListener           @udp_recv_handler    = (info) => @handle_udp_recv info
+      chrome.sockets.udp.onReceiveError.addListener      @udp_recverr_handler = (info) => @handle_udp_recverr info
 
 
 SOCKS5::terminate = () ->
@@ -91,12 +113,14 @@ SOCKS5::terminate = () ->
   chrome.sockets.tcpServer.onAcceptError.removeListener  @accepterr_handler
   chrome.sockets.tcp.onReceive.removeListener            @recv_handler
   chrome.sockets.tcp.onReceiveError.removeListener       @recverr_handler
+  chrome.sockets.udp.onReceive.removeListener            @udp_recv_handler
+  chrome.sockets.udp.onReceiveError.removeListener       @udp_recverr_handler
 
   chrome.sockets.tcpServer.close @socket_server_id
   @socket_server_id = null
 
-  for socket_id in @tcp_socket_info
-    @close_socket socket_id, false
+  @close_socket socket_id, false, "tcp" for socket_id of @tcp_socket_info
+  @close_socket socket_id, false, "udp" for socket_id of @udp_socket_info
   return
 
 
@@ -138,6 +162,7 @@ SOCKS5::cmd = (socket_id, data) ->
 
 
 SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
+  # TODO: try/catch surround?
   chrome.sockets.tcp.create name: 'remote_socket', (createInfo) =>
     @tcp_socket_info[socket_id].peer_socket_id = createInfo.socketId
 
@@ -152,7 +177,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
       @tcp_socket_info[createInfo.socketId] =
         type:            "remote"
         status:          "tcp_relay"
-        cipher:          new Encryptor @password, @method
+        cipher:          @tcp_socket_info[socket_id].cipher
         socket_id:       createInfo.socketId
         peer_socket_id:  socket_id
         cipher_action:   "decrypt"
@@ -160,7 +185,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
 
       data = @tcp_socket_info[socket_id].cipher.encrypt new Uint8Array origin_data.subarray 3
       chrome.sockets.tcp.send createInfo.socketId, data.buffer, (sendInfo) =>
-        if sendInfo.resultCode < 0 or chrome.runtime.lastError
+        if !sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
           console.error "Failed to send encrypted request to shadowsocks server:", chrome.runtime.lastError
           chrome.sockets.tcp.send socket_id, error_reply.buffer, () =>
             @close_socket socket_id
@@ -185,42 +210,109 @@ SOCKS5::cmd_bind = (socket_id, header, origin_data) ->
 
 
 SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
-  console.error "Not implemented yet."
+  console.log "Udp associated request on socket #{socket_id}"
+  # Create local udp socket
+  chrome.sockets.udp.create name: "local_socket", (socketInfo) =>
+    socketId = socketInfo.socketId    # local udp socket id
+
+    @udp_socket_info[socketId] =
+      type:            "local"
+      socket_id:       socketId
+      host_tcp_id:     socket_id
+      peer_socket_id:  null
+      last_connection: do Date.now
+
+    chrome.sockets.udp.bind socketId, '127.0.0.1', 0, (result) =>
+      chrome.sockets.udp.getInfo socketId, (socketInfo) =>
+        {localAddress, localPort} = socketInfo    # local udp socket addr and port
+        data = Common.packHeader 0x00, null, localAddress, localPort
+
+        chrome.sockets.udp.create name: "remote_socket", (socketInfo) =>
+          chrome.sockets.udp.bind socketInfo.socketId, '0.0.0.0', 0, (result) =>
+            chrome.sockets.tcp.send socket_id, data.buffer, (sendInfo) =>
+              @tcp_socket_info[socket_id].status = "udp_relay"
+              @tcp_socket_info[socket_id].peer_socket_id = socketId
+              @udp_socket_info[socketId].peer_socket_id = socketInfo.socketId
+              @udp_socket_info[socketInfo.socketId] =
+                type:            "remote"
+                socket_id:       socketInfo.socketId
+                host_tcp_id:     socket_id
+                peer_socket_id:  socketId
+                last_connection: do Date.now
 
 
 SOCKS5::tcp_relay = (socket_id, data_array) ->
+  # TODO: try/catch surround?
+  return if socket_id not of @tcp_socket_info
+  now = do Date.now
   socket_info = @tcp_socket_info[socket_id]
-  socket_info.last_connection = do Date.now
+  socket_info.last_connection = now
   peer_socket_id = socket_info.peer_socket_id
-  @tcp_socket_info[peer_socket_id].last_connection = do Date.now
+  return if peer_socket_id not of @tcp_socket_info
+  @tcp_socket_info[peer_socket_id].last_connection = now
 
-  data = socket_info.cipher[socket_info.cipher_action](data_array)
+  data = socket_info.cipher[socket_info.cipher_action] data_array
   chrome.sockets.tcp.send peer_socket_id, data.buffer, (sendInfo) =>
-    if sendInfo.resultCode < 0 or chrome.runtime.lastError and socket_id of @tcp_socket_info
-      console.debug "Failed to relay data from #{socket_info.type}
+    if !sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError and socket_id of @tcp_socket_info
+      console.debug "Failed to relay TCP data from #{socket_info.type}
         #{socket_id} to peer #{peer_socket_id}:", chrome.runtime.lastError
-      @close_socket socket_id
-      return
+      return @close_socket socket_id
+
+
+SOCKS5::udp_relay = (socket_id, data_array, remoteAddress, remotePort) ->
+  # TODO: try/catch surround?
+  return @close_socket socket_id, true, "udp" if data_array[2] isnt 0x00
+  now = do Date.now
+  socket_info = @udp_socket_info[socket_id]
+  socket_info.last_connection = now
+  peer_socket_id = socket_info.peer_socket_id
+  @udp_socket_info[peer_socket_id].last_connection = now
+  @tcp_socket_info[socket_info.host_tcp_id].last_connection = now
+  # console.log "relaying udp data from #{socket_id} to #{peer_socket_id}"
+
+  if socket_info.type is "local"
+    data = Encryptor.encrypt_all @password, @method, 1, new Uint8Array data_array.subarray 3
+    addr = @server; port = @server_port
+  else
+    decrypted = Encryptor.encrypt_all @password, @method, 0, data_array
+    data = new Uint8Array decrypted.length + 3
+    data.set decrypted, 3   # First 3 elements default to 0 when created
+    addr = remoteAddress; port = remotePort
+
+  chrome.sockets.udp.send peer_socket_id, data.buffer, addr, port, (sendInfo) =>
+    if sendInfo.resultCode < 0 or chrome.runtime.lastError
+      console.debug "Failed to relay UDP data from #{socket_info.type}
+        #{socket_id} to peer #{peer_socket_id}:", chrome.runtime.lastError
+      return @close_socket socket_info.host_tcp_id, true, "tcp"
 
 
 SOCKS5::close_socket = (socket_id, close_peer = true, protocol = "tcp") ->
+  socket_id |= 0  # convert possible string to number
   if socket_id of @["#{protocol}_socket_info"]
     peer_socket_id = @["#{protocol}_socket_info"][socket_id].peer_socket_id
+    if close_peer and @["#{protocol}_socket_info"][socket_id].status is "udp_relay"
+      @close_socket peer_socket_id, true, "udp"
+      close_peer = false
     delete @["#{protocol}_socket_info"][socket_id]['cipher']
     delete @["#{protocol}_socket_info"][socket_id]
-  chrome.sockets[protocol].close socket_id, () ->
-    if chrome.runtime.lastError
-      console.debug "Error on close #{protocol} socket #{socket_id}", chrome.runtime.lastError
-  # console.debug "Socket #{socket_id} closed"
-  if peer_socket_id of @["#{protocol}_socket_info"] and close_peer
-    @close_socket peer_socket_id, false, protocol
+  chrome.sockets[protocol].close socket_id, () =>
+    if chrome.runtime.lastError and chrome.runtime.lastError.message isnt "Socket not found"
+      console.debug "Error on close #{protocol} socket #{socket_id}:",
+                    chrome.runtime.lastError.message
+    # console.debug "#{protocol} socket #{socket_id} closed"
+    if close_peer and peer_socket_id of @["#{protocol}_socket_info"]
+      @close_socket peer_socket_id, false, protocol
 
 
 SOCKS5::sweep_socket = () ->
-  console.debug "Sweeping timeout socket..."
+  console.debug "Sweeping timeouted socket..."
   for socket_id, socket of @tcp_socket_info
     if Date.now() - socket.last_connection >= @timeout * 1000
-      chrome.sockets.tcp.getInfo socket_id, (socketInfo) =>
+      chrome.sockets.tcp.getInfo socket_id|0, (socketInfo) =>
         @close_socket socket_id if not socketInfo.connected
-        console.debug "Socket #{socket_id} has been swept"
+        console.debug "TCP socket #{socket_id} has been swept"
+  for socket_id, socket of @udp_socket_info
+    if Date.now() - socket.last_connection >= @timeout * 1000
+      @close_socket socket_id, true, "udp"
+      console.debug "UDP socket #{socket_id} has been swept"
   return

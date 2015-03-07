@@ -20,6 +20,10 @@
         "background", "storage"
     ],
     "sockets": {
+        "udp": {
+            "send": ["*:*"],
+            "bind": ["*:*"]
+        },
         "tcp": {
             "connect": ["*:*"]
         },
