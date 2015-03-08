@@ -28,7 +28,7 @@ Encryptor = (@key, @method) ->
   if @_method_info
     @cipher = @get_cipher @key, @method, 1, forge.random.getBytesSync @_method_info[1]
   else
-    console.error "method #{method} is not supported."
+    console._error "method #{method} is not supported."
   return
 
 
