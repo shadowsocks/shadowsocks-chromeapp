@@ -166,6 +166,7 @@ SOCKS5::cmd = (socket_id, data) ->
 SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
   # TODO: try/catch surround?
   console._debug "Start processing connect command"
+  return if socket_id not of @tcp_socket_info
   chrome.sockets.tcp.create name: 'remote_socket', (createInfo) =>
     @tcp_socket_info[socket_id].peer_socket_id = createInfo.socketId
     console._verbose "TCP socket to remote server created on #{createInfo.socketId}"
