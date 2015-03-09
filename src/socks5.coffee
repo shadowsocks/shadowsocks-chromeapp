@@ -24,9 +24,6 @@ SOCKS5 = (config) ->
   @udp_socket_info = {}
   @socket_server_id = null
   {@server, @server_port, @password, @method, @local_port, @timeout} = config
-  setInterval () =>
-    do @sweep_socket
-  , @timeout * 1000
   return
 
 
@@ -90,6 +87,10 @@ SOCKS5::handle_udp_recverr = (info) ->
     @close_socket socketId, false, "udp"
 
 
+SOCKS5::config = (config) ->
+  {@server, @server_port, @password, @method, @local_port, @timeout} = config
+
+
 SOCKS5::listen = () ->
   chrome.sockets.tcpServer.create {}, (createInfo) =>
     @socket_server_id = createInfo.socketId
@@ -108,6 +109,10 @@ SOCKS5::listen = () ->
       chrome.sockets.udp.onReceive.addListener           @udp_recv_handler    = (info) => @handle_udp_recv info
       chrome.sockets.udp.onReceiveError.addListener      @udp_recverr_handler = (info) => @handle_udp_recverr info
 
+      @sweep_task_id = setInterval () =>
+        do @sweep_socket
+      , @timeout * 1000
+
 
 SOCKS5::terminate = () ->
   chrome.sockets.tcpServer.onAccept.removeListener       @accept_handler
@@ -120,6 +125,7 @@ SOCKS5::terminate = () ->
   chrome.sockets.tcpServer.close @socket_server_id
   @socket_server_id = null
 
+  clearInterval @sweep_task_id
   @close_socket socket_id, false, "tcp" for socket_id of @tcp_socket_info
   @close_socket socket_id, false, "udp" for socket_id of @udp_socket_info
   return console.info "Server terminated"
