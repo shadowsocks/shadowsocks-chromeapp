@@ -94,7 +94,7 @@ SOCKS5::config = (config) ->
 SOCKS5::listen = () ->
   chrome.sockets.tcpServer.create {}, (createInfo) =>
     @socket_server_id = createInfo.socketId
-    chrome.sockets.tcpServer.listen @socket_server_id, '0.0.0.0', @local_port, (result) =>
+    chrome.sockets.tcpServer.listen @socket_server_id, '0.0.0.0', @local_port | 0, (result) =>
       if result < 0 or chrome.runtime.lastError
         console._error "Listen on port #{@local_port} failed:", chrome.runtime.lastError
         chrome.sockets.tcpServer.close @socket_server_id
@@ -144,7 +144,11 @@ SOCKS5::auth = (socket_id, data) ->
       @close_socket socket_id
     return
 
-  chrome.sockets.tcp.send socket_id, new Uint8Array([0x05, 0x00]).buffer, () =>
+  chrome.sockets.tcp.send socket_id, new Uint8Array([0x05, 0x00]).buffer, (sendInfo) =>
+    if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
+      console._error "Failed to send choice no authentication method to client:", chrome.runtime.lastError
+      @close_socket socket_id, false, "tcp"
+      return
     @tcp_socket_info[socket_id].status = "cmd"
     @tcp_socket_info[socket_id].last_connection = do Date.now
     console._log "SOCKS5 auth passed"
@@ -177,7 +181,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
     @tcp_socket_info[socket_id].peer_socket_id = createInfo.socketId
     console._verbose "TCP socket to remote server created on #{createInfo.socketId}"
 
-    chrome.sockets.tcp.connect createInfo.socketId, @server, @server_port, (result) =>
+    chrome.sockets.tcp.connect createInfo.socketId, @server, @server_port | 0, (result) =>
       error_reply = Common.packHeader 0x01, 0x01, '0.0.0.0', 0
       if result < 0 or chrome.runtime.lastError
         console._error "Failed to connect to shadowsocks server:", chrome.runtime.lastError
@@ -197,7 +201,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
 
       data = @tcp_socket_info[socket_id].cipher.encrypt new Uint8Array origin_data.subarray 3
       chrome.sockets.tcp.send createInfo.socketId, data.buffer, (sendInfo) =>
-        if !sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
+        if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
           console._error "Failed to send encrypted request to shadowsocks server:", chrome.runtime.lastError
           chrome.sockets.tcp.send socket_id, error_reply.buffer, () =>
             @close_socket socket_id
@@ -206,7 +210,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
         console._verbose "TCP relay request had been sent to remote server"
         data = Common.packHeader 0x00, 0x01, '0.0.0.0', 0
         chrome.sockets.tcp.send socket_id, data.buffer, (sendInfo) =>
-          if sendInfo.resultCode < 0 or chrome.runtime.lastError
+          if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
             console._error "Failed to send connect success reply to client:", chrome.runtime.lastError
             @close_socket socket_id
             return
@@ -271,7 +275,7 @@ SOCKS5::tcp_relay = (socket_id, data_array) ->
 
   data = socket_info.cipher[socket_info.cipher_action] data_array
   chrome.sockets.tcp.send peer_socket_id, data.buffer, (sendInfo) =>
-    if !sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError and socket_id of @tcp_socket_info
+    if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError and socket_id of @tcp_socket_info
       console._info "Failed to relay TCP data from #{socket_info.type}
         #{socket_id} to peer #{peer_socket_id}:", chrome.runtime.lastError
       return @close_socket socket_id
@@ -290,7 +294,7 @@ SOCKS5::udp_relay = (socket_id, data_array, remoteAddress, remotePort) ->
 
   if socket_info.type is "local"
     data = Encryptor.encrypt_all @password, @method, 1, new Uint8Array data_array.subarray 3
-    addr = @server; port = @server_port
+    addr = @server; port = @server_port | 0
   else
     decrypted = Encryptor.encrypt_all @password, @method, 0, data_array
     data = new Uint8Array decrypted.length + 3
