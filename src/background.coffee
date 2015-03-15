@@ -19,14 +19,22 @@
 # SOFTWARE.
 
 
-Local = (config) ->
-  @socks5 = new SOCKS5 config
-  do @socks5.listen
+sswindow = null
 
-local = new Local
-  server: "127.0.0.1"
-  server_port: 8388
-  local_port: 1080
-  password: '1234'
-  method: 'aes-256-cfb'
-  timeout: 300
+chrome.app.runtime.onLaunched.addListener () ->
+  chrome.app.window.create '../views/window.html',
+    id: 'shadowsocks-gui'
+    innerBounds:
+      width:  345
+      height: 410
+    resizable: false
+  , (createdWindow) ->
+    if createdWindow isnt sswindow
+      sswindow = createdWindow
+      sswindow.onMinimized.addListener () ->
+        do sswindow.hide
+
+
+chrome.runtime.onMessage.addListener (msg, sender, sendResp) ->
+  socks5 = new SOCKS5 msg
+  do socks5.listen
