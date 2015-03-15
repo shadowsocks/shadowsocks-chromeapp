@@ -33,6 +33,7 @@ chrome.app.runtime.onLaunched.addListener () ->
       sswindow = createdWindow
       sswindow.onMinimized.addListener () ->
         do sswindow.hide
+    do sswindow.show
 
 
 chrome.runtime.onMessage.addListener (msg, sender, sendResp) ->
