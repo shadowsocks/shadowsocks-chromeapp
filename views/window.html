@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html ng-app="shadowsocks" ng-csp>
+<head>
+    <title>Shadowsocks GUI</title>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css"/>
+    <link rel="stylesheet" type="text/css" href="css/angular-csp.css"/>
+    <style>
+        body {
+            margin: 10px;
+            overflow-x: hidden;
+        }
+        .col-sm-2 {
+            width: 30%;
+            line-height: 30px;
+        }
+        .col-sm-10 {
+            width: 70%;
+            line-height: 30px;
+        }
+        .col-sm-1, .col-sm-2,  .col-sm-3,  .col-sm-4,
+        .col-sm-5, .col-sm-6,  .col-sm-7,  .col-sm-8,
+        .col-sm-9, .col-sm-10, .col-sm-11, .col-sm-12 {
+            float: left;
+        }
+        .form-group:last-child {
+            margin-top: 25px;
+        }
+        .alert {
+            min-height: 1em;
+            font-size: 0.9em;
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 2px 10px 2px 10px;
+        }
+    </style>
+    <script src="lib/angular.min.js"></script>
+    <script src="lib/ui-bootstrap-tpls.min.js"></script>
+
+    <script src="shadowsocks/app.js"></script>
+    <script src="shadowsocks/services.js"></script>
+    <script src="shadowsocks/controllers.js"></script>
+</head>
+<body ng-controller="shadowsocks">
+<alert type="{{alert.type}}" ng-style="{visibility: alert && 'visible' || 'hidden'}">{{alert.msg}}</alert>
+<div class="form-horizontal small">
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right" for="inputServerIP">Server IP</label>
+        <div class="controls col-sm-10">
+            <div class="input-append combo">
+                <div class="input-group">
+                    <input class="form-control input-sm" type="text" autocomplete="off" placeholder="Server IP" ng-disabled="!isLoaded" ng-model="currentProfile.server" typeahead="profileKey for profileKey in profileKeys | filter:$viewValue" typeahead-on-select="switchProfile($item)">
+                    <span class="input-group-btn" dropdown>
+                        <button class="btn btn-default btn-sm dropdown-toggle" ng-disabled="!isLoaded" dropdown-toggle>
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu pull-right" role="menu">
+                            <li class="server" ng-repeat="(key, profile) in profiles" ng-click="switchProfile(key)"><a tabindex="-1" href="#"><i class="icon-ok"></i>{{key}}</a></li>
+                            <li class="fixed insert-point divider"></li>
+                            <li class="fixed"><a tabindex="-1" href="#" ng-click="createNewProfile()"><i class="glyphicon glyphicon-plus"></i> Create A New Profile</a></li>
+                            <li class="fixed"><a tabindex="-1" href="#" ng-click="deleteCurrentProfile()"><i class="glyphicon glyphicon-trash"></i> Delete Current Profile</a></li>
+                        </ul>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right" for="inputServerPort">Server Port</label>
+        <div class="controls col-sm-10">
+            <input type="text" class="form-control input-sm" placeholder="Server Port" ng-disabled="!isLoaded" ng-model="currentProfile.server_port">
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right" for="inputPassword">Password</label>
+        <div class="controls col-sm-10">
+            <input type="password" class="form-control input-sm" placeholder="Password" ng-disabled="!isLoaded" ng-model="currentProfile.password">
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right" for="inputLocalPort">Local Port</label>
+        <div class="controls col-sm-10">
+            <input type="text" class="form-control input-sm" placeholder="Local Port" value="1080" ng-disabled="!isLoaded" ng-model="currentProfile.local_port">
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right" for="selectMethod">Encryption</label>
+        <div class="controls col-sm-10">
+            <select class="form-control input-sm" ng-disabled="!isLoaded" ng-model="currentProfile.method">
+                <option value="aes-256-cfb">AES-256-CFB</option>
+                <option value="aes-192-cfb">AES-192-CFB</option>
+                <option value="aes-128-cfb">AES-128-CFB</option>
+                <option value="aes-192-cfb">AES-256-OFB</option>
+                <option value="aes-192-cfb">AES-192-OFB</option>
+                <option value="aes-128-cfb">AES-128-OFB</option>
+                <option value="aes-192-cfb">AES-256-CTR</option>
+                <option value="aes-192-cfb">AES-192-CTR</option>
+                <option value="aes-128-cfb">AES-128-CTR</option>
+                <option value="rc4-md5">RC4-MD5</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right" for="inputLocalPort">Timeout</label>
+        <div class="controls col-sm-10">
+            <input type="text" class="form-control input-sm" placeholder="Timeout" ng-disabled="!isLoaded" ng-model="currentProfile.timeout">
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right"></label>
+        <div class="controls col-sm-10 text-right">
+            <div class="btn-group">
+                <button class="btn btn-primary" ng-disabled="!isLoaded" ng-click="saveProfile()"><i class="glyphicon glyphicon-ok"></i> Save</button>
+                <button class="btn btn-default" title="About"><i class="glyphicon glyphicon-info-sign"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

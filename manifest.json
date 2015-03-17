@@ -1,25 +1,35 @@
 {
-    "name":"shadowsocks",
-    "description":"shadowsocks client for Chrome.",
-    "version":"0.1",
+    "name":"Shadowsocks",
+    "description":"Shadowsocks client for Chrome.",
+    "version":"0.9",
     "manifest_version":2,
+    "minimum_chrome_version": "41",
     "app":{
         "background":{
-            "scripts":["background.js"]
+            "scripts":[
+                "vendor/forge.min.js", "vendor/jsrc4.js", "lib/logging.js",
+                "lib/common.js", "lib/crypto/rc4_md5.js", "lib/crypto/forge.js",
+                "lib/encrypt.js", "lib/socks5.js", "lib/background.js"
+            ]
         }
     },
     "icons":{
-        "16":"icon-16.png",
-        "128":"icon-128.png"
+        "16":"res/img/icon-16.png",
+        "128":"res/img/icon-128.png"
     },
-    "permissions":[
-        "storage",
-        "experimental",
-        {
-            "socket":[
-                "tcp-connect",
-                "tcp-listen"
-            ]
+    "permissions": [
+        "background", "storage"
+    ],
+    "sockets": {
+        "udp": {
+            "send": ["*:*"],
+            "bind": ["*:*"]
+        },
+        "tcp": {
+            "connect": ["*:*"]
+        },
+        "tcpServer": {
+            "listen": ["*:*"]
         }
-    ]
+    }
 }

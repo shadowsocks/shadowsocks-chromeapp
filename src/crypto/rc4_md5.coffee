@@ -1,4 +1,4 @@
-# Copyright (c) 2012 clowwindy
+# Copyright (c) 2015 Sunny
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -18,19 +18,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-merge = (left, right, comparison) ->
-  result = new Array()
-  while (left.length > 0) and (right.length > 0)
-    if comparison(left[0], right[0]) <= 0
-      result.push left.shift()
-    else
-      result.push right.shift()
-  result.push left.shift()  while left.length > 0
-  result.push right.shift()  while right.length > 0
-  result
-merge_sort = (array, comparison) ->
-  return array  if array.length < 2
-  middle = Math.ceil(array.length / 2)
-  merge merge_sort(array.slice(0, middle), comparison), merge_sort(array.slice(middle), comparison), comparison
-  
-window.merge_sort = merge_sort
+
+Crypto = if Crypto? then Crypto else {}
+
+
+# (String, binstr, binstr, 0|1)
+Crypto.RC4_MD5 = (cipher_name, key, iv, op) ->
+  md5 = do forge.md.md5.create
+  md5.update key
+  md5.update iv
+  rc4_key = md5.digest().bytes()
+  @cipher = new RC4 Common.str2Uint8 rc4_key
+  return
+
+
+# (Uint8Array) -> Uint8Array
+Crypto.RC4_MD5::update = (data) ->
+  len    = data.length
+  buf    = new Uint8Array data
+  result = new Uint8Array len
+  @cipher.update result, buf, len
+  return result

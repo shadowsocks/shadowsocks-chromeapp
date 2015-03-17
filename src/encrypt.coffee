@@ -1,4 +1,4 @@
-# Copyright (c) 2012 clowwindy
+# Copyright (c) 2015 clowwindy
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -18,73 +18,123 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-int32Max = Math.pow(2, 32)
 
-cachedTables = {} # password: [encryptTable, decryptTable]
+# (str, str)
+Encryptor = (@key, @method) ->
+  @iv_sent = false
+  @cipher_iv = ""
+  @decipher = null
+  @_method_info = Encryptor.get_method_info @method
+  if @_method_info
+    @cipher = @get_cipher @key, @method, 1, forge.random.getBytesSync @_method_info[1]
+  else
+    console._error "method #{method} is not supported."
+  return
 
-window.getTable = (key) ->
-  if cachedTables[key]
-    return cachedTables[key]
-  console.log "calculating ciphers"
-  table = new Array(256)
-  decrypt_table = new Array(256)
-  md5sum_str = rstr_md5(key)
-  md5sum = new ArrayBuffer(8)
-  md5sum_array = new Uint8Array(md5sum, 0, 8)
-  for i in [0..7]
-    md5sum_array[i] = md5sum_str.charCodeAt(i)
-  al = new Uint32Array(md5sum, 0, 1)[0]
-  ah = new Uint32Array(md5sum, 4, 1)[0]
-  i = 0
 
-  while i < 256
-    table[i] = i
-    i++
-  i = 1
+Encryptor.method_supported =
+  'rc4-md5': [16, 16, Crypto.RC4_MD5]
+  'aes-128-cfb': [16, 16, Crypto.Forge]
+  'aes-192-cfb': [24, 16, Crypto.Forge]
+  'aes-256-cfb': [32, 16, Crypto.Forge]
+  'aes-128-ofb': [16, 16, Crypto.Forge]
+  'aes-192-ofb': [24, 16, Crypto.Forge]
+  'aes-256-ofb': [32, 16, Crypto.Forge]
+  'aes-128-ctr': [16, 16, Crypto.Forge]
+  'aes-192-ctr': [24, 16, Crypto.Forge]
+  'aes-256-ctr': [32, 16, Crypto.Forge]
 
-  while i < 1024
-    table = merge_sort(table, (x, y) ->
-      ((ah % (x + i)) * int32Max + al) % (x + i) - ((ah % (y + i)) * int32Max + al) % (y + i)
-    )
-    i++
-  i = 0
-  while i < 256
-    decrypt_table[table[i]] = i
-    ++i
-  result = [table, decrypt_table]
-  cachedTables[key] = result
-  result
-  
-encrypt = (table, buf) ->
-  i = 0
 
-  array = new Uint8Array(buf)
-  while i < array.length
-    array[i] = table[array[i]]
-    i++
-  buf
-  
+# (str, int, int) -> [binstr, binstr]
+Encryptor._bytes_to_key_cache = {}
+Encryptor.EVP_BytesToKey = (password, key_len, iv_len) ->
+  cached_key = "#{password}-#{key_len}-#{iv_len}"
+  if cached_key of Encryptor._bytes_to_key_cache
+    return Encryptor._bytes_to_key_cache[cached_key]
+  m = []
+  count = 0
+  while count < key_len + iv_len
+    md5 = do forge.md.md5.create
+    data = (m[m.length - 1] || '') + password
+    md5.update data
+    d = md5.digest().bytes()
+    m.push d
+    count += d.length
+  ms = m.join ''
+  key = ms[0...key_len]
+  iv  = ms[key_len...key_len + iv_len]
+  Encryptor._bytes_to_key_cache[cached_key] = [key, iv]
+  return [key, iv]
 
-class Encryptor
-  constructor: (key, @method) ->
-    if @method?
-      @cipher = crypto.createCipher @method, key
-      @decipher = crypto.createDecipher @method, key
-    else
-      [@encryptTable, @decryptTable] = getTable(key)
-      
-  encrypt: (buf) ->
-    if @method?
-      result = new Buffer(@cipher.update(buf.toString('binary')), 'binary')
-      result
-    else
-      encrypt @encryptTable, buf
-      
-  decrypt: (buf) ->
-    if @method?
-      result = new Buffer(@decipher.update(buf.toString('binary')), 'binary')
-      result
-    else
-      encrypt @decryptTable, buf
-      
-window.Encryptor = Encryptor
+
+# (str) -> [int, int, cipherclass]
+Encryptor.get_method_info = (method) ->
+  Encryptor.method_supported[do method.toLowerCase]
+
+
+# () -> int
+Encryptor::iv_len = () ->
+  @cipher_iv.length
+
+
+# (str, str, 0/1, binstr) -> cipher
+Encryptor::get_cipher = (password, method, op, iv) ->
+  [key_len, iv_len, impl] = @_method_info
+  [key, ] = Encryptor.EVP_BytesToKey password, key_len, iv_len
+  iv = iv[0...iv_len]
+  if op is 1
+    @cipher_iv = iv
+  new impl method, key, iv, op
+
+
+# (Uint8Array|binstr) -> Uint8Array
+Encryptor::encrypt = (buf) ->
+  if Object::toString.call(buf) is "[object String]"
+    buf = Common.str2Uint8 buf
+  return buf if buf.length is 0
+  return @cipher.update buf if @iv_sent
+  @iv_sent = true
+  encrypted_array = @cipher.update buf
+  cipher_iv_array = Common.str2Uint8 @cipher_iv
+  combined = new Uint8Array encrypted_array.length + cipher_iv_array.length
+  combined.set cipher_iv_array, 0
+  combined.set encrypted_array, cipher_iv_array.length
+  return combined
+
+
+# (Uint8Array|binstr) -> Uint8Array
+Encryptor::decrypt = (buf) ->
+  if Object::toString.call(buf) is "[object String]"
+    buf = Common.str2Uint8 buf
+  return buf if buf.length is 0
+  if not @decipher?
+    decipher_iv_len = @_method_info[1]
+    @decipher_iv = Common.uint82Str buf.subarray(0, decipher_iv_len)
+    @decipher = @get_cipher @key, @method, 0, @decipher_iv
+    buf = new Uint8Array buf.subarray decipher_iv_len
+    return buf if buf.length is 0
+  return @decipher.update buf
+
+
+# (String, String, 0|1, Uint8Array|binstr) -> Uint8Array
+Encryptor.encrypt_all = (password, method, op, data) ->
+  if Object::toString.call(data) is "[object String]"
+    data = Common.str2Uint8 data
+
+  [key_len, iv_len, impl] = Encryptor.get_method_info method
+  [key, ] = Encryptor.EVP_BytesToKey password, key_len, iv_len
+
+  if op is 1    # Encrypt
+    iv = forge.random.getBytesSync iv_len
+  else          # Decrypt
+    iv = Common.uint82Str data.subarray(0, iv_len)
+    data = new Uint8Array data.subarray iv_len
+
+  cipher = new impl method, key, iv, op
+  encrypted_array = cipher.update data
+
+  return encrypted_array if op is 0
+  combined = new Uint8Array iv_len + encrypted_array.length
+  combined.set Common.str2Uint8(iv), 0
+  combined.set encrypted_array, iv_len
+  return combined
