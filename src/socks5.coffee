@@ -228,7 +228,7 @@ SOCKS5::cmd_bind = (socket_id, header, origin_data) ->
 
 SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
   console._debug "Udp associated request on socket #{socket_id}"
-  # Create local udp socket
+  return if socket_id not of @tcp_socket_info
   chrome.sockets.udp.create name: "local_socket", (socketInfo) =>
     socketId = socketInfo.socketId    # local udp socket id
 
@@ -240,26 +240,45 @@ SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
       last_connection: do Date.now
 
     chrome.sockets.udp.bind socketId, '127.0.0.1', 0, (result) =>
-      chrome.sockets.udp.getInfo socketId, (socketInfo) =>
-        {localAddress, localPort} = socketInfo    # local udp socket addr and port
-        console._verbose "UDP local-side socket created on #{localAddress}:#{localPort}"
-        data = Common.packHeader 0x00, null, localAddress, localPort
+      if result < 0 or chrome.runtime.lastError
+        console._error "Failed to bind local UDP socket to free port", chrome.runtime.lastError
+        @close_socket socketId, false, "udp"
+        @close_socket socket_id, false, "tcp"
+        return
 
-        chrome.sockets.udp.create name: "remote_socket", (socketInfo) =>
-          chrome.sockets.udp.bind socketInfo.socketId, '0.0.0.0', 0, (result) =>
-            console._verbose "UDP remote-side socket created"
-            
+      console._verbose "UDP local-side socket created and bound"
+      chrome.sockets.udp.create name: "remote_socket", (socketInfo) =>
+        @udp_socket_info[socketId].peer_socket_id = socketInfo.socketId
+        @udp_socket_info[socketInfo.socketId] =
+          type:            "remote"
+          socket_id:       socketInfo.socketId
+          host_tcp_id:     socket_id
+          peer_socket_id:  socketId
+          last_connection: do Date.now
+
+        chrome.sockets.udp.bind socketInfo.socketId, '0.0.0.0', 0, (result) =>
+          if result < 0 or chrome.runtime.lastError
+            console._error "Failed to bind remote UDP socket to free port", chrome.runtime.lastError
+            @close_socket socket_id, false, "tcp"
+            @close_socket socketInfo.socketId, true, "udp"
+            return
+
+          console._verbose "UDP remote-side socket created and bound"
+          chrome.sockets.udp.getInfo socketId, (socketInfo) =>
+            {localAddress, localPort} = socketInfo    # local udp socket addr and port
+            console._verbose "UDP local-side socket bound on #{localAddress}:#{localPort}"
+
+            data = Common.packHeader 0x00, null, localAddress, localPort
             chrome.sockets.tcp.send socket_id, data.buffer, (sendInfo) =>
-              console._log "TCP reply for success init UDP relay sent"
+              if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
+                console._error "Failed to send UDP relay init success message", chrome.runtime.lastError
+                @close_socket socketId, true, "udp"
+                @close_socket socket_id, false, "tcp"
+              return
+
               @tcp_socket_info[socket_id].status = "udp_relay"
               @tcp_socket_info[socket_id].peer_socket_id = socketId
-              @udp_socket_info[socketId].peer_socket_id = socketInfo.socketId
-              @udp_socket_info[socketInfo.socketId] =
-                type:            "remote"
-                socket_id:       socketInfo.socketId
-                host_tcp_id:     socket_id
-                peer_socket_id:  socketId
-                last_connection: do Date.now
+              console._log "TCP reply for success init UDP relay sent"
 
 
 SOCKS5::tcp_relay = (socket_id, data_array) ->
