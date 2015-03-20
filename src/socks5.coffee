@@ -187,6 +187,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
         console._error "Failed to connect to shadowsocks server:", chrome.runtime.lastError
         chrome.sockets.tcp.send socket_id, error_reply.buffer, () =>
           @close_socket socket_id
+          @close_socket createInfo.socketId
         return
 
       console._verbose "TCP socket #{createInfo.socketId} to remote server connection established"
