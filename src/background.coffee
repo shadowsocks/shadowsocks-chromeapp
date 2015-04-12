@@ -20,6 +20,7 @@
 
 
 sswindow = null
+sslocal = new SOCKS5()
 
 chrome.app.runtime.onLaunched.addListener () ->
   chrome.app.window.create '../views/window.html',
@@ -37,5 +38,10 @@ chrome.app.runtime.onLaunched.addListener () ->
 
 
 chrome.runtime.onMessage.addListener (msg, sender, sendResp) ->
-  socks5 = new SOCKS5 msg
-  do socks5.listen
+  {type, config} = msg;
+  return if type isnt "SOCKS5OP"
+  sslocal.terminate () ->
+    sslocal.config config if config
+    sslocal.listen (info) ->
+      sendResp info
+  return true

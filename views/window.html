@@ -48,13 +48,14 @@
         <div class="controls col-sm-10">
             <div class="input-append combo">
                 <div class="input-group">
-                    <input class="form-control input-sm" type="text" autocomplete="off" placeholder="Server IP" ng-disabled="!isLoaded" ng-model="currentProfile.server" typeahead="profileKey for profileKey in profileKeys | filter:$viewValue" typeahead-on-select="switchProfile($item)">
+                    <input class="form-control input-sm" type="text" autocomplete="off" placeholder="Server IP" ng-model="currentProfile.server" typeahead="profile.server as profile.name for profile in profileKeys | contains:$viewValue | limitTo:8" typeahead-on-select="switchProfile($item.key)">
                     <span class="input-group-btn" dropdown>
-                        <button class="btn btn-default btn-sm dropdown-toggle" ng-disabled="!isLoaded" dropdown-toggle>
+                        <button class="btn btn-default btn-sm dropdown-toggle" dropdown-toggle>
                             <span class="caret"></span>
                         </button>
                         <ul class="dropdown-menu pull-right" role="menu">
-                            <li class="server" ng-repeat="(key, profile) in profiles" ng-click="switchProfile(key)"><a tabindex="-1" href="#"><i class="icon-ok"></i>{{key}}</a></li>
+                            <li class="server" ng-repeat="(id, profile) in profiles" ng-click="switchProfile(id)">
+                                <a tabindex="-1" href="#"><i class="icon-ok"></i>{{profile.server + ':' + profile.server_port}}</a></li>
                             <li class="fixed insert-point divider"></li>
                             <li class="fixed"><a tabindex="-1" href="#" ng-click="createNewProfile()"><i class="glyphicon glyphicon-plus"></i> Create A New Profile</a></li>
                             <li class="fixed"><a tabindex="-1" href="#" ng-click="deleteCurrentProfile()"><i class="glyphicon glyphicon-trash"></i> Delete Current Profile</a></li>
@@ -67,25 +68,25 @@
     <div class="form-group">
         <label class="control-label col-sm-2 text-right" for="inputServerPort">Server Port</label>
         <div class="controls col-sm-10">
-            <input type="text" class="form-control input-sm" placeholder="Server Port" ng-disabled="!isLoaded" ng-model="currentProfile.server_port">
+            <input type="text" class="form-control input-sm" placeholder="Server Port" ng-model="currentProfile.server_port">
         </div>
     </div>
     <div class="form-group">
         <label class="control-label col-sm-2 text-right" for="inputPassword">Password</label>
         <div class="controls col-sm-10">
-            <input type="password" class="form-control input-sm" placeholder="Password" ng-disabled="!isLoaded" ng-model="currentProfile.password">
+            <input type="password" class="form-control input-sm" placeholder="Password" ng-model="currentProfile.password">
         </div>
     </div>
     <div class="form-group">
         <label class="control-label col-sm-2 text-right" for="inputLocalPort">Local Port</label>
         <div class="controls col-sm-10">
-            <input type="text" class="form-control input-sm" placeholder="Local Port" value="1080" ng-disabled="!isLoaded" ng-model="currentProfile.local_port">
+            <input type="text" class="form-control input-sm" placeholder="Local Port" value="1080" ng-model="currentProfile.local_port">
         </div>
     </div>
     <div class="form-group">
         <label class="control-label col-sm-2 text-right" for="selectMethod">Encryption</label>
         <div class="controls col-sm-10">
-            <select class="form-control input-sm" ng-disabled="!isLoaded" ng-model="currentProfile.method">
+            <select class="form-control input-sm" ng-model="currentProfile.method">
                 <option value="aes-256-cfb">AES-256-CFB</option>
                 <option value="aes-192-cfb">AES-192-CFB</option>
                 <option value="aes-128-cfb">AES-128-CFB</option>
@@ -102,15 +103,19 @@
     <div class="form-group">
         <label class="control-label col-sm-2 text-right" for="inputLocalPort">Timeout</label>
         <div class="controls col-sm-10">
-            <input type="text" class="form-control input-sm" placeholder="Timeout" ng-disabled="!isLoaded" ng-model="currentProfile.timeout">
+            <input type="text" class="form-control input-sm" placeholder="Timeout" ng-model="currentProfile.timeout">
         </div>
     </div>
     <div class="form-group">
         <label class="control-label col-sm-2 text-right"></label>
         <div class="controls col-sm-10 text-right">
             <div class="btn-group">
-                <button class="btn btn-primary" ng-disabled="!isLoaded" ng-click="saveProfile()"><i class="glyphicon glyphicon-ok"></i> Save</button>
-                <button class="btn btn-default" title="About"><i class="glyphicon glyphicon-info-sign"></i></button>
+                <button class="btn btn-primary" ng-click="saveAndApply()" ng-disabled="!allowSave" title="Save &amp; Apply">
+                    <i class="glyphicon glyphicon-ok"></i>Save</button>
+                <button class="btn btn-default" ng-click="reloadApp()" title="Restart">
+                    <i class="glyphicon glyphicon-refresh"></i></button>
+                <button class="btn btn-default" ng-click="about()" title="About">
+                    <i class="glyphicon glyphicon-info-sign"></i></button>
             </div>
         </div>
     </div>

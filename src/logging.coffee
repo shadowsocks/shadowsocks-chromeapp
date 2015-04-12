@@ -28,6 +28,19 @@ logging =
   ERROR:    0x3F   # For unrecoverable error
   _empty:   ()->
 
+  error: (msg...) ->
+    logging.sendMessage msg.join ' '
+    console.error msg...
+
+  sendMessage: (msg, responseCallback) ->
+    chrome.runtime.sendMessage
+      type: "LOGMSG"
+      data:
+        msg: msg
+        type: "danger"
+      timeout: 5000
+    , responseCallback
+
 
 logging.setLevel = (level) ->
   console._verbose = if (level & logging.VERBOSE) is level then console.debug else logging._empty
@@ -35,7 +48,7 @@ logging.setLevel = (level) ->
   console._log     = if (level & logging.LOG)     is level then console.log   else logging._empty
   console._info    = if (level & logging.INFO)    is level then console.info  else logging._empty
   console._warn    = if (level & logging.WARN)    is level then console.warn  else logging._empty
-  console._error   = if (level & logging.ERROR)   is level then console.error else logging._empty
+  console._error   = if (level & logging.ERROR)   is level then logging.error else logging._empty
   return
 
 logging.setLevel logging.WARN

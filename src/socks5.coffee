@@ -19,7 +19,7 @@
 # SOFTWARE.
 
 
-SOCKS5 = (config) ->
+SOCKS5 = (config = {}) ->
   @tcp_socket_info = {}
   @udp_socket_info = {}
   @socket_server_id = null
@@ -91,14 +91,15 @@ SOCKS5::config = (config) ->
   {@server, @server_port, @password, @method, @local_port, @timeout} = config
 
 
-SOCKS5::listen = () ->
+SOCKS5::listen = (callback) ->
   chrome.sockets.tcpServer.create {}, (createInfo) =>
     @socket_server_id = createInfo.socketId
     chrome.sockets.tcpServer.listen @socket_server_id, '0.0.0.0', @local_port | 0, (result) =>
       if result < 0 or chrome.runtime.lastError
-        console._error "Listen on port #{@local_port} failed:", chrome.runtime.lastError
+        console.error "Listen on port #{@local_port} failed:", chrome.runtime.lastError.message
         chrome.sockets.tcpServer.close @socket_server_id
         @socket_server_id = null
+        callback.call null, "Listen on port #{@local_port} failed:" + chrome.runtime.lastError.message
         return
 
       console.info "Listening on port #{@local_port}..."
@@ -113,8 +114,11 @@ SOCKS5::listen = () ->
         do @sweep_socket
       , @timeout * 1000
 
+      callback.call null, "Listening on port #{@local_port}..."
 
-SOCKS5::terminate = () ->
+
+SOCKS5::terminate = (callback) ->
+  console.info "Terminating server..."
   chrome.sockets.tcpServer.onAccept.removeListener       @accept_handler
   chrome.sockets.tcpServer.onAcceptError.removeListener  @accepterr_handler
   chrome.sockets.tcp.onReceive.removeListener            @recv_handler
@@ -122,13 +126,19 @@ SOCKS5::terminate = () ->
   chrome.sockets.udp.onReceive.removeListener            @udp_recv_handler
   chrome.sockets.udp.onReceiveError.removeListener       @udp_recverr_handler
 
-  chrome.sockets.tcpServer.close @socket_server_id
-  @socket_server_id = null
+  if not @socket_server_id
+    callback.call null, "Server had been terminated"
+    return console.info "Server had been terminated"
 
-  clearInterval @sweep_task_id
-  @close_socket socket_id, false, "tcp" for socket_id of @tcp_socket_info
-  @close_socket socket_id, false, "udp" for socket_id of @udp_socket_info
-  return console.info "Server terminated"
+  chrome.sockets.tcpServer.close @socket_server_id, () =>
+    @socket_server_id = null
+
+    clearInterval @sweep_task_id
+    @close_socket socket_id, false, "tcp" for socket_id of @tcp_socket_info
+    @close_socket socket_id, false, "udp" for socket_id of @udp_socket_info
+
+    callback.call null, "Server has been terminated"
+    console.info "Server has been terminated"
 
 
 SOCKS5::auth = (socket_id, data) ->
@@ -146,7 +156,7 @@ SOCKS5::auth = (socket_id, data) ->
 
   chrome.sockets.tcp.send socket_id, new Uint8Array([0x05, 0x00]).buffer, (sendInfo) =>
     if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
-      console._error "Failed to send choice no authentication method to client:", chrome.runtime.lastError
+      console._error "Failed to send choice no authentication method to client:", chrome.runtime.lastError.message
       @close_socket socket_id, false, "tcp"
       return
     @tcp_socket_info[socket_id].status = "cmd"
@@ -184,7 +194,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
     chrome.sockets.tcp.connect createInfo.socketId, @server, @server_port | 0, (result) =>
       error_reply = Common.packHeader 0x01, 0x01, '0.0.0.0', 0
       if result < 0 or chrome.runtime.lastError
-        console._error "Failed to connect to shadowsocks server:", chrome.runtime.lastError
+        console._error "Failed to connect to shadowsocks server:", chrome.runtime.lastError.message
         chrome.sockets.tcp.send socket_id, error_reply.buffer, () =>
           @close_socket socket_id
           @close_socket createInfo.socketId
@@ -203,7 +213,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
       data = @tcp_socket_info[socket_id].cipher.encrypt new Uint8Array origin_data.subarray 3
       chrome.sockets.tcp.send createInfo.socketId, data.buffer, (sendInfo) =>
         if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
-          console._error "Failed to send encrypted request to shadowsocks server:", chrome.runtime.lastError
+          console._error "Failed to send encrypted request to shadowsocks server:", chrome.runtime.lastError.message
           chrome.sockets.tcp.send socket_id, error_reply.buffer, () =>
             @close_socket socket_id
           return
@@ -212,7 +222,7 @@ SOCKS5::cmd_connect = (socket_id, header, origin_data) ->
         data = Common.packHeader 0x00, 0x01, '0.0.0.0', 0
         chrome.sockets.tcp.send socket_id, data.buffer, (sendInfo) =>
           if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
-            console._error "Failed to send connect success reply to client:", chrome.runtime.lastError
+            console._error "Failed to send connect success reply to client:", chrome.runtime.lastError.message
             @close_socket socket_id
             return
 
@@ -242,7 +252,7 @@ SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
 
     chrome.sockets.udp.bind socketId, '127.0.0.1', 0, (result) =>
       if result < 0 or chrome.runtime.lastError
-        console._error "Failed to bind local UDP socket to free port", chrome.runtime.lastError
+        console._error "Failed to bind local UDP socket to free port", chrome.runtime.lastError.message
         @close_socket socketId, false, "udp"
         @close_socket socket_id, false, "tcp"
         return
@@ -259,7 +269,7 @@ SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
 
         chrome.sockets.udp.bind socketInfo.socketId, '0.0.0.0', 0, (result) =>
           if result < 0 or chrome.runtime.lastError
-            console._error "Failed to bind remote UDP socket to free port", chrome.runtime.lastError
+            console._error "Failed to bind remote UDP socket to free port", chrome.runtime.lastError.message
             @close_socket socket_id, false, "tcp"
             @close_socket socketInfo.socketId, true, "udp"
             return
@@ -272,7 +282,7 @@ SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
             data = Common.packHeader 0x00, null, localAddress, localPort
             chrome.sockets.tcp.send socket_id, data.buffer, (sendInfo) =>
               if not sendInfo or sendInfo.resultCode < 0 or chrome.runtime.lastError
-                console._error "Failed to send UDP relay init success message", chrome.runtime.lastError
+                console._error "Failed to send UDP relay init success message", chrome.runtime.lastError.message
                 @close_socket socketId, true, "udp"
                 @close_socket socket_id, false, "tcp"
               return
