@@ -249,6 +249,8 @@ SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
       host_tcp_id:     socket_id
       peer_socket_id:  null
       last_connection: do Date.now
+      remote_address:  null
+      remote_port:     null
 
     chrome.sockets.udp.bind socketId, '127.0.0.1', 0, (result) =>
       if result < 0 or chrome.runtime.lastError
@@ -285,7 +287,7 @@ SOCKS5::cmd_udpassoc = (socket_id, header, origin_data) ->
                 console._error "Failed to send UDP relay init success message", chrome.runtime.lastError.message
                 @close_socket socketId, true, "udp"
                 @close_socket socket_id, false, "tcp"
-              return
+                return
 
               @tcp_socket_info[socket_id].status = "udp_relay"
               @tcp_socket_info[socket_id].peer_socket_id = socketId
@@ -311,9 +313,8 @@ SOCKS5::tcp_relay = (socket_id, data_array) ->
       return @close_socket socket_id
 
 
-SOCKS5::udp_relay = (socket_id, data_array, remoteAddress, remotePort) ->
+SOCKS5::udp_relay = (socket_id, data_array, remote_address, remote_port) ->
   # TODO: try/catch surround?
-  return @close_socket socket_id, true, "udp" if data_array[2] isnt 0x00
   now = do Date.now
   socket_info = @udp_socket_info[socket_id]
   socket_info.last_connection = now
@@ -323,13 +324,17 @@ SOCKS5::udp_relay = (socket_id, data_array, remoteAddress, remotePort) ->
   # console._verbose "Relaying UDP data from #{socket_id} to #{peer_socket_id}"
 
   if socket_info.type is "local"
+    return console._info "Drop unsupported fragmentation" if data_array[2] isnt 0x00
+    socket_info.remote_address = remote_address
+    socket_info.remote_port = remote_port
     data = Encryptor.encrypt_all @password, @method, 1, new Uint8Array data_array.subarray 3
     addr = @server; port = @server_port | 0
   else
     decrypted = Encryptor.encrypt_all @password, @method, 0, data_array
     data = new Uint8Array decrypted.length + 3
     data.set decrypted, 3   # First 3 elements default to 0 when created
-    addr = remoteAddress; port = remotePort
+    addr = @udp_socket_info[peer_socket_id].remote_address
+    port = @udp_socket_info[peer_socket_id].remote_port
 
   chrome.sockets.udp.send peer_socket_id, data.buffer, addr, port, (sendInfo) =>
     if sendInfo.resultCode < 0 or chrome.runtime.lastError
