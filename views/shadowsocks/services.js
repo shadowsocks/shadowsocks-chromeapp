@@ -104,7 +104,8 @@ angular.module('shadowsocks').service('ProfileManager',
       password: null,
       local_port: null,
       method: 'aes-256-cfb',
-      timeout: 300
+      timeout: 300,
+      one_time_auth: false
     }
   };
 
@@ -112,7 +113,11 @@ angular.module('shadowsocks').service('ProfileManager',
   storage.get(['config', 'profiles']).then(function(result) {
     _this.config = result.config || {currentProfile: null};
     _this.profiles = result.profiles || {};
-    _this.currentProfile = angular.copy(_this.profiles[_this.config.currentProfile] || createProfile());
+    var _curProfile = _this.profiles[_this.config.currentProfile];
+    if (_curProfile && !('one_time_auth' in _curProfile)) {
+      _curProfile.one_time_auth = false;
+    }
+    _this.currentProfile = angular.copy(_curProfile || createProfile());
     $rootScope.$broadcast('ProfileManagerReady');
   });
 
@@ -122,6 +127,9 @@ angular.module('shadowsocks').service('ProfileManager',
 
   this.switchProfile = function(profileId) {
     _this.currentProfile = angular.copy(_this.profiles[profileId]);
+    if (!'one_time_auth' in _this.currentProfile) {
+      _this.currentProfile.one_time_auth = false;
+    }
     return _this.currentProfile;
   };
 

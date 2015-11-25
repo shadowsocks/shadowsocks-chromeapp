@@ -20,13 +20,14 @@
 
 
 # (str, str)
-Encryptor = (@key, @method) ->
+Encryptor = (@key, @method, @one_time_auth = false) ->
   @iv_sent = false
-  @cipher_iv = ""
   @decipher = null
+  @cipher_counter = 0
   @_method_info = Encryptor.get_method_info @method
+  @cipher_iv = forge.random.getBytesSync @_method_info[1]
   if @_method_info
-    @cipher = @get_cipher @key, @method, 1, forge.random.getBytesSync @_method_info[1]
+    @cipher = @get_cipher @key, @method, 1, @cipher_iv
   else
     console._error "method #{method} is not supported."
   return
@@ -80,26 +81,43 @@ Encryptor::iv_len = () ->
 # (str, str, 0/1, binstr) -> cipher
 Encryptor::get_cipher = (password, method, op, iv) ->
   [key_len, iv_len, impl] = @_method_info
-  [key, ] = Encryptor.EVP_BytesToKey password, key_len, iv_len
-  iv = iv[0...iv_len]
-  if op is 1
-    @cipher_iv = iv
-  new impl method, key, iv, op
+  [@cipher_key, ] = Encryptor.EVP_BytesToKey password, key_len, iv_len
+  new impl method, @cipher_key, iv, op
 
 
-# (Uint8Array|binstr) -> Uint8Array
+# (Uint8Array) -> Uint8Array
 Encryptor::encrypt = (buf) ->
-  if Object::toString.call(buf) is "[object String]"
-    buf = Common.str2Uint8 buf
   return buf if buf.length is 0
-  return @cipher.update buf if @iv_sent
-  @iv_sent = true
-  encrypted_array = @cipher.update buf
-  cipher_iv_array = Common.str2Uint8 @cipher_iv
-  combined = new Uint8Array encrypted_array.length + cipher_iv_array.length
-  combined.set cipher_iv_array, 0
-  combined.set encrypted_array, cipher_iv_array.length
-  return combined
+  return @cipher.update buf if @iv_sent and not @one_time_auth
+
+  if @iv_sent
+    buf_len = buf.length
+    hmac = do forge.hmac.create
+    hmac.start 'sha1', @cipher_iv + forge.util.int32ToBytes(@cipher_counter++)
+    hmac.update Common.uint82Str buf
+    auth_data = hmac.digest().getBytes()[0...10]
+    combined = new Uint8Array 2 + 10 + buf_len
+    combined[0] = (buf_len & 0xff00) >> 8
+    combined[1] = buf_len & 0x00ff
+    combined.set Common.str2Uint8(auth_data), 2
+    combined.set buf, 12
+    return @cipher.update combined
+   else
+    @iv_sent = yes
+    if @one_time_auth
+      buf[0] |= 0x10
+      buf = Common.uint82Str buf
+      hmac = do forge.hmac.create
+      hmac.start 'sha1', @cipher_iv + @cipher_key
+      hmac.update buf
+      buf += hmac.digest().getBytes()[0...10]
+      buf = Common.str2Uint8 buf
+    encrypted_array = @cipher.update buf
+    cipher_iv_array = Common.str2Uint8 @cipher_iv
+    combined = new Uint8Array cipher_iv_array.length + encrypted_array.length
+    combined.set cipher_iv_array, 0
+    combined.set encrypted_array, cipher_iv_array.length
+    return combined
 
 
 # (Uint8Array|binstr) -> Uint8Array
@@ -116,24 +134,28 @@ Encryptor::decrypt = (buf) ->
   return @decipher.update buf
 
 
-# (String, String, 0|1, Uint8Array|binstr) -> Uint8Array
-Encryptor.encrypt_all = (password, method, op, data) ->
-  if Object::toString.call(data) is "[object String]"
-    data = Common.str2Uint8 data
-
+# (String, String, 0|1, Uint8Array, Boolean) -> Uint8Array
+Encryptor.encrypt_all = (password, method, op, data, one_time_auth) ->
   [key_len, iv_len, impl] = Encryptor.get_method_info method
   [key, ] = Encryptor.EVP_BytesToKey password, key_len, iv_len
 
   if op is 1    # Encrypt
     iv = forge.random.getBytesSync iv_len
+    if one_time_auth
+      data[0] |= 0x10
+      data = Common.uint82Str data
+      hmac = do forge.hmac.create
+      hmac.start 'sha1', iv + key
+      hmac.update data
+      data = Common.str2Uint8 data + hmac.digest().getBytes()[0...10]
   else          # Decrypt
     iv = Common.uint82Str data.subarray(0, iv_len)
     data = new Uint8Array data.subarray iv_len
 
   cipher = new impl method, key, iv, op
   encrypted_array = cipher.update data
-
   return encrypted_array if op is 0
+
   combined = new Uint8Array iv_len + encrypted_array.length
   combined.set Common.str2Uint8(iv), 0
   combined.set encrypted_array, iv_len

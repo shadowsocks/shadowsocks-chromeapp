@@ -23,7 +23,8 @@ SOCKS5 = (config = {}) ->
   @tcp_socket_info = {}
   @udp_socket_info = {}
   @socket_server_id = null
-  {@server, @server_port, @password, @method, @local_port, @timeout} = config
+  {@server, @server_port, @password, @method,
+   @local_port, @timeout, @one_time_auth} = config
   return
 
 
@@ -33,7 +34,7 @@ SOCKS5::handle_accept = (info) ->
   @tcp_socket_info[clientSocketId] =
     type:            "local"
     status:          "auth"
-    cipher:          new Encryptor @password, @method
+    cipher:          new Encryptor @password, @method, @one_time_auth
     socket_id:       clientSocketId
     cipher_action:   "encrypt"
     peer_socket_id:  null
@@ -88,7 +89,8 @@ SOCKS5::handle_udp_recverr = (info) ->
 
 
 SOCKS5::config = (config) ->
-  {@server, @server_port, @password, @method, @local_port, @timeout} = config
+  {@server, @server_port, @password, @method,
+   @local_port, @timeout, @one_time_auth} = config
 
 
 SOCKS5::listen = (callback) ->
@@ -327,10 +329,10 @@ SOCKS5::udp_relay = (socket_id, data_array, remote_address, remote_port) ->
     return console._info "Drop unsupported fragmentation" if data_array[2] isnt 0x00
     socket_info.remote_address = remote_address
     socket_info.remote_port = remote_port
-    data = Encryptor.encrypt_all @password, @method, 1, new Uint8Array data_array.subarray 3
+    data = Encryptor.encrypt_all @password, @method, 1, new Uint8Array(data_array.subarray(3)), @one_time_auth
     addr = @server; port = @server_port | 0
   else
-    decrypted = Encryptor.encrypt_all @password, @method, 0, data_array
+    decrypted = Encryptor.encrypt_all @password, @method, 0, data_array, @one_time_auth
     data = new Uint8Array decrypted.length + 3
     data.set decrypted, 3   # First 3 elements default to 0 when created
     addr = @udp_socket_info[peer_socket_id].remote_address

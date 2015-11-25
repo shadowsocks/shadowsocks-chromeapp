@@ -78,7 +78,7 @@
         </div>
     </div>
     <div class="form-group">
-        <label class="control-label col-sm-2 text-right" for="inputLocalPort">Local Port</label>
+        <label class="control-label col-sm-2 text-right">Local Port</label>
         <div class="controls col-sm-10">
             <input type="text" class="form-control input-sm" placeholder="Local Port" value="1080" ng-model="currentProfile.local_port">
         </div>
@@ -101,9 +101,20 @@
         </div>
     </div>
     <div class="form-group">
-        <label class="control-label col-sm-2 text-right" for="inputLocalPort">Timeout</label>
+        <label class="control-label col-sm-2 text-right">Timeout</label>
         <div class="controls col-sm-10">
             <input type="text" class="form-control input-sm" placeholder="Timeout" ng-model="currentProfile.timeout">
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="control-label col-sm-2 text-right">
+          <abbr title="One-time Auth">OTAuth</abbr>
+        </label>
+        <div class="controls col-sm-10">
+            <select class="form-control input-sm"
+                    ng-model="currentProfile.one_time_auth"
+                    ng-options="o.v as o.n for o in [{ n: 'Disabled', v: false }, { n: 'Enabled', v: true }]">
+            </select>
         </div>
     </div>
     <div class="form-group">
