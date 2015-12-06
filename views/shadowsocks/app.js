@@ -21,4 +21,4 @@ SOFTWARE.
 */
 
 
-angular.module('shadowsocks', ['ui.bootstrap']);
+angular.module('shadowsocks', ['ngMaterial']);

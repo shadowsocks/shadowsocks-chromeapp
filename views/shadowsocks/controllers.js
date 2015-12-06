@@ -20,10 +20,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
 angular.module('shadowsocks').controller('shadowsocks',
-  ['$scope', '$rootScope', '$timeout', 'ProfileManager', function($scope, $rootScope, $timeout, ProfileManager) {
+  ['$scope', '$rootScope', '$timeout', '$mdSidenav', 'ProfileManager', function($scope, $rootScope, $timeout, $mdSidenav, ProfileManager) { 
+  $scope.toggleMenu = function() {
+    $mdSidenav('menu').toggle();
+  };
 
+  $scope.closeMenu = function() {
+    $mdSidenav('menu').close();
+  }
+      
   var generateProfileKeys = function() {
     var result = [], profile;
     for (key in $scope.profiles) {
@@ -34,7 +40,7 @@ angular.module('shadowsocks').controller('shadowsocks',
   };
 
   $rootScope.$on('ProfileManagerReady', function() {
-    $scope.allowSave = true;
+    $scope.running = false;
     $scope.currentProfile = ProfileManager.currentProfile;
     $scope.profiles = ProfileManager.profiles;
     $scope.profileKeys = generateProfileKeys();
@@ -64,16 +70,8 @@ angular.module('shadowsocks').controller('shadowsocks',
   $scope.switchProfile = function(profileId) {
     $scope.currentProfile = ProfileManager.switchProfile(profileId);
   };
-
-  $scope.saveAndApply = function() {
-    if (!$scope.currentProfile.server   || !$scope.currentProfile.server_port ||
-        !$scope.currentProfile.password || !$scope.currentProfile.local_port ||
-        !$scope.currentProfile.method   || !$scope.currentProfile.timeout) {
-      $scope.alert = { type: 'danger', msg: 'Fill all blanks before save' };
-      return;
-    }
-
-    $scope.allowSave = false;
+      
+  $scope.save = function() {
     ProfileManager.saveAsCurrent().then(function() {
       $scope.profiles = ProfileManager.profiles;
       $scope.profileKeys = generateProfileKeys();
@@ -82,13 +80,21 @@ angular.module('shadowsocks').controller('shadowsocks',
         type: "SOCKS5OP",
         config: $scope.currentProfile
       }, function(info) {
-        $scope.allowSave = true;
         $scope.alert = { type: 'info', msg: info };
         $scope.$apply();
       });
-
     });
   };
+
+  $scope.startStop = function() {
+    if (running) {
+      //TODO
+      running = false;
+    } else {
+      //TODO
+      running = true;
+    }
+  }
 
   $scope.deleteCurrentProfile = function() {
     ProfileManager.deleteProfile($scope.currentProfile.id).then(function() {
