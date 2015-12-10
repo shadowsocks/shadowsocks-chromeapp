@@ -15,14 +15,14 @@
 <md-content layout-padding style="height: inherit;">
     <md-toolbar>
         <div class="md-toolbar-tools">
-          <md-button class="md-primary" ng-click="toggleMenu()">
+          <md-button class="md-primary" aria-label="Menu" ng-click="toggleMenu()">
             <md-icon md-svg-icon="svg/ic_menu_white_48px.svg"></md-icon>
           </md-button>
           <span flex></span>
-          <md-button ng-click="save()">
+          <md-button aria-label="Save" ng-click="save()">
             <md-icon md-svg-icon="svg/ic_save_white_48px.svg"></md-icon>
           </md-button>
-          <md-switch ng-click="startStop()" ng-model="running"></md-switch>
+          <md-switch aria-label="Switch" ng-model="running" ng-click="startStop()"></md-switch>
         </div>
     </md-toolbar>
     <form name="profileForm">
@@ -32,7 +32,7 @@
         </md-input-container>
         <md-input-container class="md-block">
             <label>Server Port</label>
-            <input placeholder="8388" ng-model="currentProfile.server_port" required ng-pattern="/^[0-9]+$" ng-maxlength="5">
+            <input ng-model="currentProfile.server_port" required ng-pattern="/^[0-9]+$" ng-maxlength="5">
         </md-input-container>
         <md-input-container class="md-block">
             <label>Password</label>
@@ -40,7 +40,7 @@
         </md-input-container>
         <md-input-container class="md-block">
             <label>Local Port</label>
-            <input type="text" placeholder="1080" ng-model="currentProfile.local_port" required ng-pattern="/^[0-9]+$" ng-maxlength="5">
+            <input type="text" ng-model="currentProfile.local_port" required ng-pattern="/^[0-9]+$" ng-maxlength="5">
         </md-input-container>
         <md-input-container class="md-block">
             <label>Encryption</label>
@@ -48,18 +48,18 @@
                 <md-option value="aes-256-cfb">AES-256-CFB</md-option>
                 <md-option value="aes-192-cfb">AES-192-CFB</md-option>
                 <md-option value="aes-128-cfb">AES-128-CFB</md-option>
-                <md-option value="aes-192-cfb">AES-256-OFB</md-option>
-                <md-option value="aes-192-cfb">AES-192-OFB</md-option>
-                <md-option value="aes-128-cfb">AES-128-OFB</md-option>
-                <md-option value="aes-192-cfb">AES-256-CTR</md-option>
-                <md-option value="aes-192-cfb">AES-192-CTR</md-option>
-                <md-option value="aes-128-cfb">AES-128-CTR</md-option>
+                <md-option value="aes-256-ofb">AES-256-OFB</md-option>
+                <md-option value="aes-192-ofb">AES-192-OFB</md-option>
+                <md-option value="aes-128-ofb">AES-128-OFB</md-option>
+                <md-option value="aes-256-ctr">AES-256-CTR</md-option>
+                <md-option value="aes-192-ctr">AES-192-CTR</md-option>
+                <md-option value="aes-128-ctr">AES-128-CTR</md-option>
                 <md-option value="rc4-md5">RC4-MD5</md-option>
             </md-select>
         </md-input-container>
         <md-input-container class="md-block">
             <label>Timeout</label>
-            <input placeholder="600" ng-model="currentProfile.timeout" required ng-pattern="/^[0-9]+$" ng-maxlength="4">
+            <input ng-model="currentProfile.timeout" required ng-pattern="/^[0-9]+$" ng-maxlength="4">
         </md-input-container>
         <md-checkbox class="md-block" ng-model="currentProfile.one_time_auth">
             One-time authentication

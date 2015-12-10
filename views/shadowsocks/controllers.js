@@ -21,7 +21,8 @@ SOFTWARE.
 */
 
 angular.module('shadowsocks').controller('shadowsocks',
-  ['$scope', '$rootScope', '$timeout', '$mdSidenav', 'ProfileManager', function($scope, $rootScope, $timeout, $mdSidenav, ProfileManager) { 
+  ['$scope', '$rootScope', '$timeout', '$mdSidenav', 'ProfileManager', function($scope, $rootScope, $timeout, $mdSidenav, ProfileManager) {
+  $scope.running = false;
   $scope.toggleMenu = function() {
     $mdSidenav('menu').toggle();
   };
@@ -29,7 +30,7 @@ angular.module('shadowsocks').controller('shadowsocks',
   $scope.closeMenu = function() {
     $mdSidenav('menu').close();
   }
-      
+
   var generateProfileKeys = function() {
     var result = [], profile;
     for (key in $scope.profiles) {
@@ -40,7 +41,6 @@ angular.module('shadowsocks').controller('shadowsocks',
   };
 
   $rootScope.$on('ProfileManagerReady', function() {
-    $scope.running = false;
     $scope.currentProfile = ProfileManager.currentProfile;
     $scope.profiles = ProfileManager.profiles;
     $scope.profileKeys = generateProfileKeys();
@@ -70,31 +70,27 @@ angular.module('shadowsocks').controller('shadowsocks',
   $scope.switchProfile = function(profileId) {
     $scope.currentProfile = ProfileManager.switchProfile(profileId);
   };
-      
+
   $scope.save = function() {
     ProfileManager.saveAsCurrent().then(function() {
       $scope.profiles = ProfileManager.profiles;
       $scope.profileKeys = generateProfileKeys();
-
-      chrome.runtime.sendMessage({
-        type: "SOCKS5OP",
-        config: $scope.currentProfile
-      }, function(info) {
-        $scope.alert = { type: 'info', msg: info };
-        $scope.$apply();
-      });
     });
   };
 
   $scope.startStop = function() {
-    if (running) {
-      //TODO
-      running = false;
+    if ($scope.running) {
+      //TODO stop
     } else {
-      //TODO
-      running = true;
+      //TODO save if unsaved
+      chrome.runtime.sendMessage({
+        type: "SOCKS5OP",
+        config: $scope.currentProfile
+      });
+      //TODO if fail, set running to true as a trick
+      //to set switch back to off (double switched)
     }
-  }
+  };
 
   $scope.deleteCurrentProfile = function() {
     ProfileManager.deleteProfile($scope.currentProfile.id).then(function() {
