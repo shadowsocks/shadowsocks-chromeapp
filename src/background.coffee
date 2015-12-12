@@ -26,8 +26,8 @@ chrome.app.runtime.onLaunched.addListener () ->
   chrome.app.window.create '../views/window.html',
     id: 'shadowsocks-gui'
     innerBounds:
-      width:  345
-      height: 450
+      width:  360
+      height: 480
     resizable: false
   , (createdWindow) ->
     if createdWindow isnt sswindow
