@@ -32,7 +32,7 @@
         </md-input-container>
         <md-input-container class="md-block">
             <label>Server Port</label>
-            <input ng-model="currentProfile.server_port" required ng-pattern="/^[0-9]+$" ng-maxlength="5">
+            <input type="number" required min="0" max="65536" ng-model="currentProfile.server_port">
         </md-input-container>
         <md-input-container class="md-block">
             <label>Password</label>
@@ -40,7 +40,7 @@
         </md-input-container>
         <md-input-container class="md-block">
             <label>Local Port</label>
-            <input type="text" ng-model="currentProfile.local_port" required ng-pattern="/^[0-9]+$" ng-maxlength="5">
+            <input type="number" required min="0" max="65536"  ng-model="currentProfile.local_port">
         </md-input-container>
         <md-input-container class="md-block">
             <label>Encryption</label>
@@ -59,7 +59,7 @@
         </md-input-container>
         <md-input-container class="md-block">
             <label>Timeout</label>
-            <input ng-model="currentProfile.timeout" required ng-pattern="/^[0-9]+$" ng-maxlength="4">
+            <input ng-model="currentProfile.timeout" type="number" required min="10" max="9999" >
         </md-input-container>
         <md-checkbox class="md-block" ng-model="currentProfile.one_time_auth">
             One-time authentication
