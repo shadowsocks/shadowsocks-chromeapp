@@ -67,21 +67,21 @@
     </form>
 </md-content>
     <md-sidenav class="md-sidenav-left md-whiteframe-z2" md-component-id="menu" layout="column" ng-click="closeMenu()">
-        <md-button ng-repeat="(id, profile) in profiles" ng-click="switchProfile(id)">
+        <md-button style="text-align:left" ng-repeat="(id, profile) in profiles" ng-click="switchProfile(id)">
             {{profile.server + ':' + profile.server_port}}
         </md-button>
         <md-divider></md-divider>
-        <md-button ng-click="createNewProfile()">
+        <md-button style="text-align:left" ng-click="createNewProfile()">
           <md-icon md-svg-icon="svg/ic_add_black_48px.svg"></md-icon>
           Create A New Profile
         </md-button>
-        <md-button ng-click="deleteCurrentProfile()">
+        <md-button style="text-align:left" ng-click="deleteCurrentProfile()">
           <md-icon md-svg-icon="svg/ic_delete_black_48px.svg"></md-icon>
           Delete Current Profile
         </md-button>
         <md-divider></md-divider>
-        <md-button ng-click="reloadApp()">Restart</md-button>
-        <md-button ng-click="about()">
+        <md-button style="text-align:left" ng-click="reloadApp()">Restart</md-button>
+        <md-button style="text-align:left" ng-click="about()">
           <md-icon md-svg-icon="svg/ic_info_black_48px.svg"></md-icon>
           About
         </md-button>
