@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Sunny
+# Copyright (c) 2016 Sunny
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -38,10 +38,14 @@ chrome.app.runtime.onLaunched.addListener () ->
 
 
 chrome.runtime.onMessage.addListener (msg, sender, sendResp) ->
-  {type, config} = msg;
+  {type, action, config} = msg
   return if type isnt "SOCKS5OP"
-  sslocal.terminate () ->
-    sslocal.config config if config
-    sslocal.listen (info) ->
-      sendResp info
+  if action is 'connect'
+    sslocal.terminate () ->
+      sslocal.config config if config
+      sslocal.listen (info) ->
+        sendResp info
+  else if action is 'disconnect'
+    sslocal.terminate () ->
+      sendResp "Disconnected"
   return true

@@ -10,6 +10,15 @@
     <script src="shadowsocks/app.js"></script>
     <script src="shadowsocks/services.js"></script>
     <script src="shadowsocks/controllers.js"></script>
+    <style>
+      .md-button[disabled] > md-icon > svg {
+        fill: rgba(0,0,0,0.26);
+      }
+      .md-errors-spacer {
+        /* Workaround for https://github.com/angular/material/issues/6214 */
+        min-height: 0!important;
+      }
+    </style>
 </head>
 <body ng-controller="shadowsocks">
 <md-content layout-padding style="height: inherit;">
@@ -19,7 +28,7 @@
             <md-icon md-svg-icon="svg/ic_menu_white_48px.svg"></md-icon>
           </md-button>
           <span flex></span>
-          <md-button aria-label="Save" ng-click="save()">
+          <md-button aria-label="Save" ng-click="save()" ng-disabled="running">
             <md-icon md-svg-icon="svg/ic_save_white_48px.svg"></md-icon>
           </md-button>
           <md-switch aria-label="Switch" ng-model="running" ng-click="startStop()"></md-switch>
@@ -27,24 +36,24 @@
     </md-toolbar>
     <form name="profileForm">
         <md-input-container class="md-block">
-            <label>Server IP</label>
-            <input ng-model="currentProfile.server" type="text" required>
+            <label>Server Address</label>
+            <input ng-model="currentProfile.server" type="text" ng-disabled="running" required>
         </md-input-container>
         <md-input-container class="md-block">
             <label>Server Port</label>
-            <input type="number" required min="0" max="65536" ng-model="currentProfile.server_port">
+            <input type="number" required min="0" max="65536" ng-disabled="running" ng-model="currentProfile.server_port">
         </md-input-container>
         <md-input-container class="md-block">
             <label>Password</label>
-            <input type="password" ng-model="currentProfile.password" required>
+            <input type="password" ng-model="currentProfile.password" ng-disabled="running" required>
         </md-input-container>
         <md-input-container class="md-block">
             <label>Local Port</label>
-            <input type="number" required min="0" max="65536"  ng-model="currentProfile.local_port">
+            <input type="number" required min="0" max="65536" ng-disabled="running" ng-model="currentProfile.local_port">
         </md-input-container>
         <md-input-container class="md-block">
             <label>Encryption</label>
-            <md-select ng-model="currentProfile.method">
+            <md-select ng-model="currentProfile.method" ng-disabled="running">
                 <md-option value="aes-256-cfb">AES-256-CFB</md-option>
                 <md-option value="aes-192-cfb">AES-192-CFB</md-option>
                 <md-option value="aes-128-cfb">AES-128-CFB</md-option>
@@ -59,32 +68,32 @@
         </md-input-container>
         <md-input-container class="md-block">
             <label>Timeout</label>
-            <input ng-model="currentProfile.timeout" type="number" required min="10" max="9999" >
+            <input ng-model="currentProfile.timeout" type="number" required min="10" max="9999" ng-disabled="running">
         </md-input-container>
-        <md-checkbox class="md-block" ng-model="currentProfile.one_time_auth">
+        <md-checkbox class="md-block" ng-model="currentProfile.one_time_auth" ng-disabled="running">
             One-time authentication
         </md-checkbox>
     </form>
 </md-content>
-    <md-sidenav class="md-sidenav-left md-whiteframe-z2" md-component-id="menu" layout="column" ng-click="closeMenu()">
-        <md-button style="text-align:left" ng-repeat="(id, profile) in profiles" ng-click="switchProfile(id)">
-            {{profile.server + ':' + profile.server_port}}
-        </md-button>
-        <md-divider></md-divider>
-        <md-button style="text-align:left" ng-click="createNewProfile()">
-          <md-icon md-svg-icon="svg/ic_add_black_48px.svg"></md-icon>
-          Create A New Profile
-        </md-button>
-        <md-button style="text-align:left" ng-click="deleteCurrentProfile()">
-          <md-icon md-svg-icon="svg/ic_delete_black_48px.svg"></md-icon>
-          Delete Current Profile
-        </md-button>
-        <md-divider></md-divider>
-        <md-button style="text-align:left" ng-click="reloadApp()">Restart</md-button>
-        <md-button style="text-align:left" ng-click="about()">
-          <md-icon md-svg-icon="svg/ic_info_black_48px.svg"></md-icon>
-          About
-        </md-button>
-    </md-sidenav>
+<md-sidenav class="md-sidenav-left md-whiteframe-z2" md-component-id="menu" layout="column" ng-click="closeMenu()">
+    <md-button style="text-align:left" ng-repeat="(id, profile) in profiles" ng-click="switchProfile(id)" ng-disabled="running">
+        {{profile.server + ':' + profile.server_port}}
+    </md-button>
+    <md-divider></md-divider>
+    <md-button style="text-align:left" ng-click="createNewProfile()" ng-disabled="running">
+      <md-icon md-svg-icon="svg/ic_add_black_48px.svg"></md-icon>
+      Create A New Profile
+    </md-button>
+    <md-button style="text-align:left" ng-click="deleteCurrentProfile()" ng-disabled="running">
+      <md-icon md-svg-icon="svg/ic_delete_black_48px.svg"></md-icon>
+      Delete Current Profile
+    </md-button>
+    <md-divider></md-divider>
+    <md-button style="text-align:left" ng-click="reloadApp()">Restart</md-button>
+    <md-button style="text-align:left" ng-click="about()">
+      <md-icon md-svg-icon="svg/ic_info_black_48px.svg"></md-icon>
+      About
+    </md-button>
+</md-sidenav>
 </body>
 </html>

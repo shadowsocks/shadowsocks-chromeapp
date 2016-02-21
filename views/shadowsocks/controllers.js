@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015 Sunny
+Copyright (c) 2016 Sunny
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@ SOFTWARE.
 */
 
 angular.module('shadowsocks').controller('shadowsocks',
-  ['$scope', '$rootScope', '$timeout', '$mdSidenav', 'ProfileManager', function($scope, $rootScope, $timeout, $mdSidenav, ProfileManager) {
+  ['$scope', '$rootScope', '$timeout', '$mdSidenav', '$mdToast', 'ProfileManager', function($scope, $rootScope, $timeout, $mdSidenav, $mdToast, ProfileManager) {
   $scope.running = false;
   $scope.toggleMenu = function() {
     $mdSidenav('menu').toggle();
@@ -46,28 +46,26 @@ angular.module('shadowsocks').controller('shadowsocks',
     $scope.profileKeys = generateProfileKeys();
   });
 
-  var timeoutPromise = null, originAlert = null;
   chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     if (msg.type !== "LOGMSG") return;
-    if (msg.timeout) {
-      if (timeoutPromise)
-        $timeout.cancel(timeoutPromise);
-      else
-        originAlert = $scope.alert;
-      timeoutPromise = $timeout(function() {
-        $scope.alert = originAlert;
-        timeoutPromise = null;
-      }, msg.timeout);
-    }
-    $scope.alert = msg.data;
-    $scope.$apply();
+    $scope.showToast(msg);
   });
+
+  $scope.showToast = function(msg) {
+    $mdToast.show(
+      $mdToast.simple()
+        .textContent(msg.data || msg)
+        .position('bottom right')
+        .hideDelay(msg.timeout || 3000)
+    );
+  };
 
   $scope.createNewProfile = function() {
     $scope.currentProfile = ProfileManager.createProfile();
   };
 
   $scope.switchProfile = function(profileId) {
+    if ($scope.running) { return; }
     $scope.currentProfile = ProfileManager.switchProfile(profileId);
   };
 
@@ -80,15 +78,22 @@ angular.module('shadowsocks').controller('shadowsocks',
 
   $scope.startStop = function() {
     if ($scope.running) {
-      //TODO stop
-    } else {
-      //TODO save if unsaved
       chrome.runtime.sendMessage({
         type: "SOCKS5OP",
-        config: $scope.currentProfile
+        action: 'disconnect'
+      }, function(info) {
+        $scope.showToast(info)
       });
-      //TODO if fail, set running to true as a trick
-      //to set switch back to off (double switched)
+    } else {
+      $scope.save();
+      chrome.runtime.sendMessage({
+        type: "SOCKS5OP",
+        action: 'connect',
+        config: $scope.currentProfile
+      }, function(info) {
+        $scope.running = (info.indexOf('failed') == -1);
+        $scope.showToast(info);
+      });
     }
   };
 
