@@ -20,9 +20,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
 angular.module('shadowsocks').controller('shadowsocks',
-  ['$scope', '$rootScope', '$timeout', 'ProfileManager', function($scope, $rootScope, $timeout, ProfileManager) {
+  ['$scope', '$rootScope', '$timeout', '$mdSidenav', 'ProfileManager', function($scope, $rootScope, $timeout, $mdSidenav, ProfileManager) {
+  $scope.running = false;
+  $scope.toggleMenu = function() {
+    $mdSidenav('menu').toggle();
+  };
+
+  $scope.closeMenu = function() {
+    $mdSidenav('menu').close();
+  }
 
   var generateProfileKeys = function() {
     var result = [], profile;
@@ -34,7 +41,6 @@ angular.module('shadowsocks').controller('shadowsocks',
   };
 
   $rootScope.$on('ProfileManagerReady', function() {
-    $scope.allowSave = true;
     $scope.currentProfile = ProfileManager.currentProfile;
     $scope.profiles = ProfileManager.profiles;
     $scope.profileKeys = generateProfileKeys();
@@ -65,29 +71,25 @@ angular.module('shadowsocks').controller('shadowsocks',
     $scope.currentProfile = ProfileManager.switchProfile(profileId);
   };
 
-  $scope.saveAndApply = function() {
-    if (!$scope.currentProfile.server   || !$scope.currentProfile.server_port ||
-        !$scope.currentProfile.password || !$scope.currentProfile.local_port ||
-        !$scope.currentProfile.method   || !$scope.currentProfile.timeout) {
-      $scope.alert = { type: 'danger', msg: 'Fill all blanks before save' };
-      return;
-    }
-
-    $scope.allowSave = false;
+  $scope.save = function() {
     ProfileManager.saveAsCurrent().then(function() {
       $scope.profiles = ProfileManager.profiles;
       $scope.profileKeys = generateProfileKeys();
+    });
+  };
 
+  $scope.startStop = function() {
+    if ($scope.running) {
+      //TODO stop
+    } else {
+      //TODO save if unsaved
       chrome.runtime.sendMessage({
         type: "SOCKS5OP",
         config: $scope.currentProfile
-      }, function(info) {
-        $scope.allowSave = true;
-        $scope.alert = { type: 'info', msg: info };
-        $scope.$apply();
       });
-
-    });
+      //TODO if fail, set running to true as a trick
+      //to set switch back to off (double switched)
+    }
   };
 
   $scope.deleteCurrentProfile = function() {

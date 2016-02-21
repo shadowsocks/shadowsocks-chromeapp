@@ -1,135 +1,90 @@
 <!DOCTYPE html>
 <html ng-app="shadowsocks" ng-csp>
 <head>
-    <title>Shadowsocks GUI</title>
-    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css"/>
-    <link rel="stylesheet" type="text/css" href="css/angular-csp.css"/>
-    <style>
-        body {
-            margin: 10px;
-            overflow-x: hidden;
-        }
-        .col-sm-2 {
-            width: 30%;
-            line-height: 30px;
-        }
-        .col-sm-10 {
-            width: 70%;
-            line-height: 30px;
-        }
-        .col-sm-1, .col-sm-2,  .col-sm-3,  .col-sm-4,
-        .col-sm-5, .col-sm-6,  .col-sm-7,  .col-sm-8,
-        .col-sm-9, .col-sm-10, .col-sm-11, .col-sm-12 {
-            float: left;
-        }
-        .form-group:last-child {
-            margin-top: 25px;
-        }
-        .alert {
-            min-height: 1em;
-            font-size: 0.9em;
-            text-align: center;
-            margin-bottom: 10px;
-            padding: 2px 10px 2px 10px;
-        }
-    </style>
+    <title>Shadowsocks</title>
+    <link rel="stylesheet" type="text/css" href="css/angular-material.min.css"/>
     <script src="lib/angular.min.js"></script>
-    <script src="lib/ui-bootstrap-tpls.min.js"></script>
-
+    <script src="lib/angular-animate.min.js"></script>
+    <script src="lib/angular-aria.min.js"></script>
+    <script src="lib/angular-material.min.js"></script>
     <script src="shadowsocks/app.js"></script>
     <script src="shadowsocks/services.js"></script>
     <script src="shadowsocks/controllers.js"></script>
 </head>
 <body ng-controller="shadowsocks">
-<alert type="{{alert.type}}" ng-style="{visibility: alert && 'visible' || 'hidden'}">{{alert.msg}}</alert>
-<div class="form-horizontal small">
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right" for="inputServerIP">Server IP</label>
-        <div class="controls col-sm-10">
-            <div class="input-append combo">
-                <div class="input-group">
-                    <input class="form-control input-sm" type="text" autocomplete="off" placeholder="Server IP" ng-model="currentProfile.server" typeahead="profile.server as profile.name for profile in profileKeys | contains:$viewValue | limitTo:8" typeahead-on-select="switchProfile($item.key)">
-                    <span class="input-group-btn" dropdown>
-                        <button class="btn btn-default btn-sm dropdown-toggle" dropdown-toggle>
-                            <span class="caret"></span>
-                        </button>
-                        <ul class="dropdown-menu pull-right" role="menu">
-                            <li class="server" ng-repeat="(id, profile) in profiles" ng-click="switchProfile(id)">
-                                <a tabindex="-1" href="#"><i class="icon-ok"></i>{{profile.server + ':' + profile.server_port}}</a></li>
-                            <li class="fixed insert-point divider"></li>
-                            <li class="fixed"><a tabindex="-1" href="#" ng-click="createNewProfile()"><i class="glyphicon glyphicon-plus"></i> Create A New Profile</a></li>
-                            <li class="fixed"><a tabindex="-1" href="#" ng-click="deleteCurrentProfile()"><i class="glyphicon glyphicon-trash"></i> Delete Current Profile</a></li>
-                        </ul>
-                    </span>
-                </div>
-            </div>
+<md-content layout-padding style="height: inherit;">
+    <md-toolbar>
+        <div class="md-toolbar-tools">
+          <md-button class="md-primary" aria-label="Menu" ng-click="toggleMenu()">
+            <md-icon md-svg-icon="svg/ic_menu_white_48px.svg"></md-icon>
+          </md-button>
+          <span flex></span>
+          <md-button aria-label="Save" ng-click="save()">
+            <md-icon md-svg-icon="svg/ic_save_white_48px.svg"></md-icon>
+          </md-button>
+          <md-switch aria-label="Switch" ng-model="running" ng-click="startStop()"></md-switch>
         </div>
-    </div>
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right" for="inputServerPort">Server Port</label>
-        <div class="controls col-sm-10">
-            <input type="text" class="form-control input-sm" placeholder="Server Port" ng-model="currentProfile.server_port">
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right" for="inputPassword">Password</label>
-        <div class="controls col-sm-10">
-            <input type="password" class="form-control input-sm" placeholder="Password" ng-model="currentProfile.password">
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right">Local Port</label>
-        <div class="controls col-sm-10">
-            <input type="text" class="form-control input-sm" placeholder="Local Port" value="1080" ng-model="currentProfile.local_port">
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right" for="selectMethod">Encryption</label>
-        <div class="controls col-sm-10">
-            <select class="form-control input-sm" ng-model="currentProfile.method">
-                <option value="aes-256-cfb">AES-256-CFB</option>
-                <option value="aes-192-cfb">AES-192-CFB</option>
-                <option value="aes-128-cfb">AES-128-CFB</option>
-                <option value="aes-192-cfb">AES-256-OFB</option>
-                <option value="aes-192-cfb">AES-192-OFB</option>
-                <option value="aes-128-cfb">AES-128-OFB</option>
-                <option value="aes-192-cfb">AES-256-CTR</option>
-                <option value="aes-192-cfb">AES-192-CTR</option>
-                <option value="aes-128-cfb">AES-128-CTR</option>
-                <option value="rc4-md5">RC4-MD5</option>
-            </select>
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right">Timeout</label>
-        <div class="controls col-sm-10">
-            <input type="text" class="form-control input-sm" placeholder="Timeout" ng-model="currentProfile.timeout">
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right">
-          <abbr title="One-time Auth">OTAuth</abbr>
-        </label>
-        <div class="controls col-sm-10">
-            <select class="form-control input-sm"
-                    ng-model="currentProfile.one_time_auth"
-                    ng-options="o.v as o.n for o in [{ n: 'Disabled', v: false }, { n: 'Enabled', v: true }]">
-            </select>
-        </div>
-    </div>
-    <div class="form-group">
-        <label class="control-label col-sm-2 text-right"></label>
-        <div class="controls col-sm-10 text-right">
-            <div class="btn-group">
-                <button class="btn btn-primary" ng-click="saveAndApply()" ng-disabled="!allowSave" title="Save &amp; Apply">
-                    <i class="glyphicon glyphicon-ok"></i>Save</button>
-                <button class="btn btn-default" ng-click="reloadApp()" title="Restart">
-                    <i class="glyphicon glyphicon-refresh"></i></button>
-                <button class="btn btn-default" ng-click="about()" title="About">
-                    <i class="glyphicon glyphicon-info-sign"></i></button>
-            </div>
-        </div>
-    </div>
-</div>
+    </md-toolbar>
+    <form name="profileForm">
+        <md-input-container class="md-block">
+            <label>Server IP</label>
+            <input ng-model="currentProfile.server" type="text" required>
+        </md-input-container>
+        <md-input-container class="md-block">
+            <label>Server Port</label>
+            <input type="number" required min="0" max="65536" ng-model="currentProfile.server_port">
+        </md-input-container>
+        <md-input-container class="md-block">
+            <label>Password</label>
+            <input type="password" ng-model="currentProfile.password" required>
+        </md-input-container>
+        <md-input-container class="md-block">
+            <label>Local Port</label>
+            <input type="number" required min="0" max="65536"  ng-model="currentProfile.local_port">
+        </md-input-container>
+        <md-input-container class="md-block">
+            <label>Encryption</label>
+            <md-select ng-model="currentProfile.method">
+                <md-option value="aes-256-cfb">AES-256-CFB</md-option>
+                <md-option value="aes-192-cfb">AES-192-CFB</md-option>
+                <md-option value="aes-128-cfb">AES-128-CFB</md-option>
+                <md-option value="aes-256-ofb">AES-256-OFB</md-option>
+                <md-option value="aes-192-ofb">AES-192-OFB</md-option>
+                <md-option value="aes-128-ofb">AES-128-OFB</md-option>
+                <md-option value="aes-256-ctr">AES-256-CTR</md-option>
+                <md-option value="aes-192-ctr">AES-192-CTR</md-option>
+                <md-option value="aes-128-ctr">AES-128-CTR</md-option>
+                <md-option value="rc4-md5">RC4-MD5</md-option>
+            </md-select>
+        </md-input-container>
+        <md-input-container class="md-block">
+            <label>Timeout</label>
+            <input ng-model="currentProfile.timeout" type="number" required min="10" max="9999" >
+        </md-input-container>
+        <md-checkbox class="md-block" ng-model="currentProfile.one_time_auth">
+            One-time authentication
+        </md-checkbox>
+    </form>
+</md-content>
+    <md-sidenav class="md-sidenav-left md-whiteframe-z2" md-component-id="menu" layout="column" ng-click="closeMenu()">
+        <md-button style="text-align:left" ng-repeat="(id, profile) in profiles" ng-click="switchProfile(id)">
+            {{profile.server + ':' + profile.server_port}}
+        </md-button>
+        <md-divider></md-divider>
+        <md-button style="text-align:left" ng-click="createNewProfile()">
+          <md-icon md-svg-icon="svg/ic_add_black_48px.svg"></md-icon>
+          Create A New Profile
+        </md-button>
+        <md-button style="text-align:left" ng-click="deleteCurrentProfile()">
+          <md-icon md-svg-icon="svg/ic_delete_black_48px.svg"></md-icon>
+          Delete Current Profile
+        </md-button>
+        <md-divider></md-divider>
+        <md-button style="text-align:left" ng-click="reloadApp()">Restart</md-button>
+        <md-button style="text-align:left" ng-click="about()">
+          <md-icon md-svg-icon="svg/ic_info_black_48px.svg"></md-icon>
+          About
+        </md-button>
+    </md-sidenav>
 </body>
 </html>

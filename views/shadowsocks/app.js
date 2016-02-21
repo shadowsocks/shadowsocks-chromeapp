@@ -21,4 +21,10 @@ SOFTWARE.
 */
 
 
-angular.module('shadowsocks', ['ui.bootstrap']);
+angular.module('shadowsocks', ['ngMaterial'], function($provide) {
+  // Suppress "history.pushState is not available in packaged apps."
+  $provide.decorator('$window', function($delegate) {
+    $delegate.history = null;
+    return $delegate;
+  });
+});
