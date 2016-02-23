@@ -4,7 +4,7 @@ shadowsocks-chromeapp
 This is Chrome App version of shadowsocks.
 
 Other ports and clients could be found at
-[here](https://github.com/clowwindy/shadowsocks/wiki/Ports-and-Clients).
+[here](https://github.com/shadowsocks/shadowsocks/wiki/Ports-and-Clients).
 
 Usage
 -----------
